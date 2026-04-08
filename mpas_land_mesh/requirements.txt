@@ -1,0 +1,18 @@
+# Minimal requirements for ULRM Workflow module
+#
+# Note: GDAL is required but installation varies by system
+#
+# For conda users (recommended):
+#   conda install -c conda-forge gdal numpy scipy
+#
+# For pip users:
+#   pip install numpy scipy
+#   # Then install GDAL separately following system-specific instructions
+
+numpy>=1.20.0
+scipy>=1.7.0
+
+# GDAL installation notes:
+# - Linux: apt-get install python3-gdal or conda install gdal
+# - macOS: brew install gdal && pip install gdal
+# - Windows: conda install -c conda-forge gdal (recommended)
