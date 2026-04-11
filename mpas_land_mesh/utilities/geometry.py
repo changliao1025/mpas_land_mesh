@@ -1,15 +1,14 @@
 
 import math
-from typing import Union, Tuple
+from typing import Union, Tuple, List, Optional
 import numpy as np
-from typing import Union, List, Optional
+from osgeo import osr, gdal, ogr
 
-from pyearth.gis.geometry.calculate_distance_based_on_longitude_latitude import (
-    calculate_distance_based_on_longitude_latitude,
-)
+from mpas_land_mesh.utilities.geometry  import (
+        calculate_distance_based_on_longitude_latitude
+    )
 
-
-from mpas_land_mesh.utilities.constants import earth_radius
+from mpas_land_mesh.utilities.constants import earth_radius, IDL_TOLERANCE, IDL_OFFSET
 
 def calculate_angle_between_point(
     dLongitude1_in: float,
@@ -1422,7 +1421,6 @@ def calculate_polygon_file_area(sFilename_polygon_in: str) -> float:
     calculate_polygon_area : Calculate area of single polygon
     get_geometry_coordinates : Extract coordinates from OGR geometry
     """
-    from pyearth.gis.location.get_geometry_coordinates import get_geometry_coordinates
 
     pDriver = ogr.GetDriverByName("GeoJSON")
     pDataSource = pDriver.Open(sFilename_polygon_in, 0)
@@ -1669,3 +1667,869 @@ def split_international_date_line_polygon_coordinates(aCoords_gcs):
         result = [aCoords]
 
     return result
+
+
+
+def calculate_signed_area_shoelace(coords: np.ndarray) -> float:
+    x, y = coords[:, 0], coords[:, 1]
+
+    # Vectorized shoelace formula - more efficient than loops
+    # Handle the wrap-around (last point to first point) implicitly
+    x_rolled = np.roll(x, -1)  # x[i+1] for all i, with wrap-around
+    y_rolled = np.roll(y, -1)  # y[i+1] for all i, with wrap-around
+
+    signed_area = 0.5 * np.sum(x * y_rolled - x_rolled * y)
+    return signed_area
+
+def remove_duplicate_closure(coords: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Remove duplicated closing vertex when first and last are equal."""
+    if len(coords) > 1 and np.allclose(coords[0], coords[-1], atol=1.0e-12):
+        return coords[:-1]
+    return coords
+
+def calculate_signed_area_spherical_polar(
+    coords: np.ndarray, pole: str = "north"
+) -> float:
+    """Calculate signed spherical area for polygons enclosing a pole.
+
+    The polygon is projected with Lambert azimuthal equal-area (LAEA) centered
+    on the requested pole, then planar signed area is computed with the
+    shoelace formula. With unit sphere radius, output area is in steradians.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Polygon coordinates as (lon, lat) degrees.
+    pole : str, default="north"
+        Polar center for projection, either "north" or "south".
+
+    Returns
+    -------
+    float
+        Signed spherical area (steradians on unit sphere).
+    """
+    if not isinstance(coords, np.ndarray) or coords.ndim != 2 or coords.shape[1] != 2:
+        raise ValueError("coords must be a 2D numpy array with shape (n, 2)")
+
+    if len(coords) < 3:
+        return 0.0
+
+    arr = remove_duplicate_closure(coords)
+    if len(arr) < 3:
+        return 0.0
+
+    lon_rad = np.deg2rad(arr[:, 0])
+    lat_rad = np.deg2rad(arr[:, 1])
+
+    cos_lat = np.cos(lat_rad)
+    sin_lat = np.sin(lat_rad)
+
+    pole_lc = pole.lower()
+    if pole_lc == "north":
+        # LAEA centered at +90 deg latitude
+        denom = 1.0 + sin_lat
+        # Avoid divide-by-zero at antipode (not expected for pole-enclosing cells)
+        denom = np.maximum(denom, 1.0e-15)
+        k = np.sqrt(2.0 / denom)
+        x = k * cos_lat * np.sin(lon_rad)
+        y = -k * cos_lat * np.cos(lon_rad)
+    elif pole_lc == "south":
+        # LAEA centered at -90 deg latitude
+        denom = 1.0 - sin_lat
+        denom = np.maximum(denom, 1.0e-15)
+        k = np.sqrt(2.0 / denom)
+        x = k * cos_lat * np.sin(lon_rad)
+        y = k * cos_lat * np.cos(lon_rad)
+    else:
+        raise ValueError("pole must be either 'north' or 'south'")
+
+    projected = np.column_stack((x, y))
+    return calculate_signed_area_shoelace(projected)
+
+
+def _point_on_segment_2d(
+    point: NDArray[np.floating],
+    seg_start: NDArray[np.floating],
+    seg_end: NDArray[np.floating],
+    tol: float = 1.0e-12,
+) -> bool:
+    """Return True if a 2D point lies on a line segment within tolerance."""
+    px, py = point
+    x1, y1 = seg_start
+    x2, y2 = seg_end
+
+    dx = x2 - x1
+    dy = y2 - y1
+
+    # Degenerate segment
+    if abs(dx) < tol and abs(dy) < tol:
+        return np.hypot(px - x1, py - y1) <= tol
+
+    # Cross-product distance to the infinite line
+    cross = (px - x1) * dy - (py - y1) * dx
+    if abs(cross) > tol:
+        return False
+
+    # Dot-product bounds check for segment extents
+    dot = (px - x1) * dx + (py - y1) * dy
+    if dot < -tol:
+        return False
+
+    seg_len_sq = dx * dx + dy * dy
+    if dot - seg_len_sq > tol:
+        return False
+
+    return True
+
+def _point_in_polygon_2d(
+    point: NDArray[np.floating],
+    polygon: NDArray[np.floating],
+    include_boundary: bool = False,
+    tol: float = 1.0e-12,
+) -> bool:
+    """2D point-in-polygon using ray casting."""
+    poly = remove_duplicate_closure(polygon)
+    if len(poly) < 3:
+        return False
+
+    x, y = point
+
+    # Boundary check first
+    for i in range(len(poly)):
+        p1 = poly[i]
+        p2 = poly[(i + 1) % len(poly)]
+        if _point_on_segment_2d(point, p1, p2, tol=tol):
+            return include_boundary
+
+    inside = False
+    for i in range(len(poly)):
+        x1, y1 = poly[i]
+        x2, y2 = poly[(i + 1) % len(poly)]
+
+        intersects = (y1 > y) != (y2 > y)
+        if intersects:
+            x_intersect = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+            if x_intersect > x:
+                inside = not inside
+
+    return inside
+
+def polygon_includes_pole(
+    coords: NDArray[np.floating],
+    pole: str = "south",
+    include_boundary: bool = False,
+    tol: float = 1.0e-12,
+) -> bool:
+    """Check whether a polygon includes the requested pole in its interior.
+
+    The test projects lon/lat vertices into a local polar plane where the pole
+    maps to the origin, then runs a standard 2D point-in-polygon query.
+    """
+    if coords is None:
+        return False
+
+    arr = np.asarray(coords, dtype=float)
+    if arr.ndim != 2 or arr.shape[1] != 2 or len(arr) < 3:
+        return False
+
+    arr = remove_duplicate_closure(arr)
+    if len(arr) < 3:
+        return False
+
+    lons = arr[:, 0]
+    lats = arr[:, 1]
+
+    lon_rad = np.deg2rad(lons)
+    pole_lc = pole.lower()
+    if pole_lc == "south":
+        radial = np.maximum(0.0, 90.0 + lats)
+    elif pole_lc == "north":
+        radial = np.maximum(0.0, 90.0 - lats)
+    else:
+        raise ValueError("pole must be either 'south' or 'north'")
+
+    projected = np.column_stack((radial * np.cos(lon_rad), radial * np.sin(lon_rad)))
+    origin = np.array([0.0, 0.0])
+
+    return _point_in_polygon_2d(
+        origin, projected, include_boundary=include_boundary, tol=tol
+    )
+
+def unwrap_longitudes(coords: np.ndarray) -> np.ndarray:
+    """Unwrap longitude coordinates to handle International Date Line crossings.
+
+    Adjusts longitude values to ensure they are all within 180 degrees of the
+    first coordinate, preventing artificial jumps when calculating polygon areas.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Array of shape (n, 2) representing polygon coordinates in (longitude, latitude) format.
+
+    Returns
+    -------
+    np.ndarray
+        Array with unwrapped longitude coordinates, same shape as input.
+
+    Notes
+    -----
+    This function uses the first longitude point as a reference and adjusts all
+    subsequent longitudes to be within ±180 degrees of this reference point by
+    adding or subtracting 360 degrees as needed.
+
+    Examples
+    --------
+    >>> coords = np.array([[-170, 10], [170, 20], [-160, 30]])
+    >>> unwrapped = unwrap_longitudes(coords)
+    >>> # Longitudes adjusted to avoid large jumps across IDL
+    """
+    if not isinstance(coords, np.ndarray) or coords.ndim != 2 or coords.shape[1] != 2:
+        raise ValueError("coords must be a 2D numpy array with shape (n, 2)")
+
+    coords_unwrapped = coords.copy()
+    lons = coords_unwrapped[:, 0]
+    ref_lon = lons[0]
+
+    # Vectorized approach for better performance
+    diff = lons - ref_lon
+    # Adjust longitudes that are more than 180 degrees away
+    lons[diff > 180] -= 360
+    lons[diff < -180] += 360
+
+    return coords_unwrapped
+
+
+
+def check_cross_international_date_line_polygon(
+    coords: np.ndarray,
+) -> Tuple[bool, np.ndarray]:
+    """Check if polygon coordinates cross the International Date Line.
+
+    This function distinguishes between actual IDL edge crossings and vertices
+    that happen to lie exactly on the IDL meridian (±180°). Vertices on the IDL
+    without edge crossings are adjusted slightly to avoid numerical issues.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Array of polygon coordinates in (longitude, latitude) format.
+
+    Returns
+    -------
+    Tuple[bool, np.ndarray]
+        A tuple containing:
+        - bool: True if the polygon has actual edges crossing the IDL, False otherwise
+        - np.ndarray or None:
+          - If False: Adjusted coordinates with IDL vertices moved slightly off the meridian
+          - If True: None (original coordinates should be used for splitting)
+
+    Notes
+    -----
+    **IDL Detection Logic:**
+
+    1. **Vertex Detection**: Identifies vertices exactly on ±180° meridian
+    2. **Edge Crossing Detection**: Finds edges that actually cross the IDL
+       (excludes edges involving IDL vertices)
+    3. **Coordinate Adjustment**: If no edge crossings but IDL vertices exist,
+       moves these vertices slightly (±1e-6°) based on neighboring vertices
+    4. **Hemisphere Assignment**: IDL vertices are moved to the hemisphere
+       containing the majority of their neighbors
+
+    **Return Behavior:**
+
+    - Returns (False, adjusted_coords) for polygons with IDL vertices but no crossings
+    - Returns (True, None) for polygons with actual IDL edge crossings
+    - Returns (False, coords) for polygons that don't involve the IDL
+
+    This approach ensures that single IDL vertices don't cause false crossing
+    detection while preserving the ability to split truly crossing polygons.
+    """
+    try:
+        if (
+            not isinstance(coords, np.ndarray)
+            or coords.ndim != 2
+            or coords.shape[1] != 2
+        ):
+            raise ValueError("coords must be a 2D numpy array with shape (n, 2)")
+
+        if len(coords) < 3:
+            return False, coords.copy()
+
+        # Validate coordinate ranges
+        lons, lats = coords[:, 0], coords[:, 1]
+        if not (
+            np.all((-180 <= lons) & (lons <= 180))
+            and np.all((-90 <= lats) & (lats <= 90))
+        ):
+            return False, coords.copy()
+
+    except (ValueError, IndexError, TypeError):
+        return False, coords.copy()  # Invalid coordinates can't cross IDL
+
+    # Make a copy to avoid modifying the original
+    coords_updated = coords.copy()
+    lons = coords_updated[:, 0]
+
+    # Check if any vertices are exactly on the IDL
+    # Exclude the last point to avoid duplication in closed polygons (first == last)
+    # Use module-level IDL_TOLERANCE and IDL_OFFSET constants
+    idl_vertices = np.zeros_like(lons, dtype=bool)
+    idl_vertices[:-1] = np.abs(np.abs(lons[:-1]) - 180.0) < IDL_TOLERANCE
+
+    # Track hemisphere support using only non-IDL vertices.
+    non_idl_lons = lons[~idl_vertices]
+    has_eastern = np.any((non_idl_lons > 0) & (non_idl_lons < 180.0))
+    has_western = np.any((non_idl_lons < 0) & (non_idl_lons > -180.0))
+    spans_both_hemispheres = has_eastern and has_western
+
+    idl_touch_positive = np.any(np.abs(lons[idl_vertices] - 180.0) < IDL_TOLERANCE)
+    idl_touch_negative = np.any(np.abs(lons[idl_vertices] + 180.0) < IDL_TOLERANCE)
+    touches_both_idl_sides = idl_touch_positive and idl_touch_negative
+
+    # A polygon enclosing either pole necessarily crosses the IDL.
+    if polygon_includes_pole(coords_updated, pole="north") or polygon_includes_pole(
+        coords_updated, pole="south"
+    ):
+        return True, None
+
+    # If there are vertices on IDL, check if there are actual edge crossings
+    if np.any(idl_vertices):
+        lons_next = np.roll(lons, -1)
+
+        # Find eastward crossings: positive to negative longitude, excluding IDL vertices
+        eastward_crossings = (
+            (lons > 0)
+            & (lons < 180.0)
+            & (lons_next < 0)
+            & ~idl_vertices
+            & ~np.roll(idl_vertices, -1)
+        )
+
+        # Find westward crossings: negative to positive longitude, excluding IDL vertices
+        westward_crossings = (
+            (lons < 0) & (lons_next > 0) & ~idl_vertices & ~np.roll(idl_vertices, -1)
+        )
+
+        # If no actual edge crossings but polygon spans both hemispheres, it crosses IDL
+        if touches_both_idl_sides or spans_both_hemispheres:
+            # This is a true IDL crossing with vertices on the meridian
+            return True, None
+        elif not (np.any(eastward_crossings) or np.any(westward_crossings)):
+            # Adjust vertices that are exactly on the IDL by slightly moving them
+            idl_indices = np.where(idl_vertices)[0]
+            for idx in idl_indices:
+                # Determine which hemisphere to move to based on neighboring vertices
+                prev_idx = (idx - 1) % len(coords_updated)
+                next_idx = (idx + 1) % len(coords_updated)
+
+                prev_lon = coords_updated[prev_idx, 0]
+                next_lon = coords_updated[next_idx, 0]
+
+                # Count non-IDL neighbors to determine preferred hemisphere
+                neighbor_lons = []
+                if abs(abs(prev_lon) - 180.0) > IDL_TOLERANCE:  # Previous vertex not on IDL
+                    neighbor_lons.append(prev_lon)
+                if abs(abs(next_lon) - 180.0) > IDL_TOLERANCE:  # Next vertex not on IDL
+                    neighbor_lons.append(next_lon)
+
+                if neighbor_lons:
+                    # Move to hemisphere containing majority of neighbors
+                    positive_neighbors = sum(1 for lon in neighbor_lons if lon > 0)
+                    if positive_neighbors >= len(neighbor_lons) / 2:
+                        # Move to eastern hemisphere
+                        coords_updated[idx, 0] = 180.0 - IDL_OFFSET
+                    else:
+                        # Move to western hemisphere
+                        coords_updated[idx, 0] = -180.0 + IDL_OFFSET
+                else:
+                    # If neighbors are also on IDL, check overall polygon distribution
+                    positive_lons = np.sum(lons > 0)
+                    negative_lons = np.sum(lons < 0)
+
+                    if positive_lons >= negative_lons:
+                        coords_updated[idx, 0] = 180.0 - IDL_OFFSET
+                    else:
+                        coords_updated[idx, 0] = -180.0 + IDL_OFFSET
+
+            # After adjustment, no crossing
+            return False, coords_updated
+        else:
+            # There are actual edge crossings
+            return True, None
+    else:
+        # Original logic for cases without IDL vertices
+        # Check for large jumps between consecutive points (> 180 degrees)
+        lon_diffs = np.abs(np.diff(lons))
+        max_jump = np.max(lon_diffs)
+
+        # Also check the wrap-around from last to first point
+        wrap_jump = abs(lons[-1] - lons[0])
+
+        crossing = max_jump > 180 or wrap_jump > 180
+        return crossing, None
+
+
+def check_counter_clockwise(coords: np.ndarray) -> bool:
+    """Check if polygon coordinates are in counter-clockwise order.
+
+    Parameters
+    ----------
+    coords : np.ndarray
+        Array of shape (n, 2) representing polygon coordinates.
+
+    Returns
+    -------
+    bool
+        True if vertices are in counter-clockwise order, False otherwise.
+    """
+
+    if not isinstance(coords, np.ndarray) or coords.ndim != 2 or coords.shape[1] != 2:
+        raise ValueError("coords must be a 2D numpy array with shape (n, 2)")
+
+    if len(coords) < 3:
+        return True  # Degenerate case
+
+    if polygon_includes_pole(coords, pole="north"):
+        signed_area = calculate_signed_area_spherical_polar(coords, pole="north")
+    elif polygon_includes_pole(coords, pole="south"):
+        signed_area = calculate_signed_area_spherical_polar(coords, pole="south")
+    else:
+        # Check if polygon crosses the International Date Line
+        iFlag_cross, _ = check_cross_international_date_line_polygon(coords)
+        if iFlag_cross:
+            coords_unwrapped = unwrap_longitudes(coords)
+            # Calculate signed area using optimized shoelace formula
+            signed_area = calculate_signed_area_shoelace(coords_unwrapped)
+        else:
+            # Standard case: calculate signed area directly
+            signed_area = calculate_signed_area_shoelace(coords)
+    return signed_area > 0
+
+def get_geometry_coordinates(
+    geometry: ogr.Geometry,
+    enforce_ccw: bool = False,
+) -> Union[np.ndarray, List[np.ndarray]]:
+    """Extract coordinates from an OGR geometry object.
+
+    Dispatches to appropriate handler based on geometry type. For polygon
+    geometries, coordinates can optionally be enforced to be in
+    counter-clockwise (CCW) order.
+
+    Parameters
+    ----------
+    geometry : ogr.Geometry
+        OGR geometry object from which to extract coordinates.
+    enforce_ccw : bool, default=False
+        If True, polygon and multipolygon exterior rings are returned in
+        counter-clockwise order. If False, coordinates are returned in the
+        original geometry order.
+
+    Returns
+    -------
+    np.ndarray or List[np.ndarray]
+        For POINT, LINESTRING, POLYGON, LINEARRING: numpy array of shape (n, 2)
+        For MULTIPOLYGON: list of numpy arrays, one per polygon part
+
+    Raises
+    ------
+    ValueError
+        If geometry is None, invalid, or of unsupported type.
+    RuntimeError
+        If coordinate extraction fails.
+
+    Notes
+    -----
+    Supported geometry types:
+    - POINT: Returns single point as array of shape (1, 2)
+    - LINESTRING: Returns array of line vertices
+    - LINEARRING: Returns array of ring vertices
+    - POLYGON: Returns exterior ring coordinates in CCW order
+    - MULTIPOLYGON: Returns list of exterior rings, each in CCW order
+
+    Currently unsupported (will raise ValueError):
+    - MULTIPOINT, MULTILINESTRING, GEOMETRYCOLLECTION
+
+    Z-coordinates (3D) are ignored; only X and Y are extracted.
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> # Create a point geometry
+    >>> point = ogr.Geometry(ogr.wkbPoint)
+    >>> point.AddPoint(10.0, 20.0)
+    >>> coords = get_geometry_coordinates(point)
+    >>> coords.shape
+    (1, 2)
+
+    See Also
+    --------
+    get_polygon_exterior_coords : Extract polygon exterior ring
+    get_multipolygon_exterior_coords : Extract multipolygon exterior rings
+    """
+    # Validate geometry
+    if geometry is None:
+        raise ValueError("Geometry object cannot be None")
+
+    try:
+        geometry_type = geometry.GetGeometryName()
+    except Exception as e:
+        raise ValueError(f"Invalid geometry object: {e}")
+
+    # Dispatch to appropriate handler
+    if geometry_type == "POINT":
+        return get_point_coords(geometry)
+    elif geometry_type == "LINESTRING":
+        return get_linestring_coords(geometry)
+    elif geometry_type == "POLYGON":
+        return get_polygon_exterior_coords(geometry, enforce_ccw=enforce_ccw)
+    elif geometry_type == "LINEARRING":
+        return get_linearring_coords(geometry)
+    elif geometry_type == "MULTIPOLYGON":
+        return get_multipolygon_exterior_coords(geometry, enforce_ccw=enforce_ccw)
+    else:
+        raise ValueError(
+            f"Unsupported geometry type: '{geometry_type}'. "
+            "Supported types: POINT, LINESTRING, POLYGON, LINEARRING, MULTIPOLYGON"
+        )
+
+
+def get_polygon_exterior_coords(
+    polygon_geometry: ogr.Geometry, enforce_ccw: bool = False
+) -> np.ndarray:
+    """Extract exterior ring coordinates from a polygon.
+
+    Parameters
+    ----------
+    polygon_geometry : ogr.Geometry
+        OGR Polygon geometry object.
+    enforce_ccw : bool, default=False
+        If True, reverse the extracted exterior ring when needed so the
+        returned coordinates are counter-clockwise.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (n, 2) containing exterior ring coordinates.
+
+    Raises
+    ------
+    ValueError
+        If geometry is not a valid polygon or has no exterior ring.
+    RuntimeError
+        If coordinate extraction fails.
+
+    Notes
+    -----
+    - Only extracts the exterior ring; holes/interior rings are ignored
+    - Optionally reverses coordinate order if clockwise
+    - Returns (longitude, latitude) or (x, y) coordinate pairs
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> # Create a square polygon
+    >>> ring = ogr.Geometry(ogr.wkbLinearRing)
+    >>> ring.AddPoint(0, 0)
+    >>> ring.AddPoint(1, 0)
+    >>> ring.AddPoint(1, 1)
+    >>> ring.AddPoint(0, 1)
+    >>> ring.AddPoint(0, 0)
+    >>> polygon = ogr.Geometry(ogr.wkbPolygon)
+    >>> polygon.AddGeometry(ring)
+    >>> coords = get_polygon_exterior_coords(polygon)
+    >>> coords.shape[1]
+    2
+    """
+    if polygon_geometry is None:
+        raise ValueError("Polygon geometry cannot be None")
+
+    try:
+        # Get the exterior ring (index 0)
+        ring = polygon_geometry.GetGeometryRef(0)
+        if ring is None:
+            raise ValueError("Polygon has no exterior ring")
+
+        n_points = ring.GetPointCount()
+        if n_points == 0:
+            raise ValueError("Polygon exterior ring has no points")
+
+        # Extract coordinates
+        exterior_coords = []
+        for i in range(n_points):
+            point = ring.GetPoint(i)
+            exterior_coords.append((point[0], point[1]))
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract polygon coordinates: {e}")
+
+    # Convert to numpy array
+    coords_array = np.array(exterior_coords)
+
+    # Ensure counter-clockwise order when requested
+    if enforce_ccw and not check_counter_clockwise(coords_array):
+        coords_array = coords_array[::-1]
+
+    return coords_array
+
+
+def get_multipolygon_exterior_coords(
+    multipolygon_geometry: ogr.Geometry,
+    enforce_ccw: bool = False,
+) -> List[np.ndarray]:
+    """Extract exterior ring coordinates from all parts of a multipolygon.
+
+    Each polygon part's coordinates can optionally be enforced to be in
+    counter-clockwise order.
+
+    Parameters
+    ----------
+    multipolygon_geometry : ogr.Geometry
+        OGR MultiPolygon geometry object.
+    enforce_ccw : bool, default=False
+        If True, reverse each exterior ring when needed so returned
+        coordinates are counter-clockwise.
+
+    Returns
+    -------
+    List[np.ndarray]
+        List of numpy arrays, one per polygon part. Each array has shape (n, 2)
+        and contains coordinates in counter-clockwise order.
+
+    Raises
+    ------
+    ValueError
+        If geometry is not a valid multipolygon or has no parts.
+    RuntimeError
+        If coordinate extraction fails for any part.
+
+    Notes
+    -----
+    - Only extracts exterior rings; holes/interior rings are ignored
+    - Each polygon part can be independently enforced to CCW order
+    - Empty parts are skipped with a warning
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> # Create a multipolygon with 2 parts
+    >>> multi = ogr.Geometry(ogr.wkbMultiPolygon)
+    >>> # Add first polygon
+    >>> ring1 = ogr.Geometry(ogr.wkbLinearRing)
+    >>> ring1.AddPoint(0, 0)
+    >>> ring1.AddPoint(1, 0)
+    >>> ring1.AddPoint(1, 1)
+    >>> ring1.AddPoint(0, 0)
+    >>> poly1 = ogr.Geometry(ogr.wkbPolygon)
+    >>> poly1.AddGeometry(ring1)
+    >>> multi.AddGeometry(poly1)
+    >>> coords_list = get_multipolygon_exterior_coords(multi)
+    >>> len(coords_list)
+    1
+    """
+    if multipolygon_geometry is None:
+        raise ValueError("MultiPolygon geometry cannot be None")
+
+    # Validate geometry type
+    try:
+        geometry_type = multipolygon_geometry.GetGeometryName()
+        if geometry_type != "MULTIPOLYGON":
+            raise ValueError(f"Expected MULTIPOLYGON geometry, got '{geometry_type}'")
+    except Exception as e:
+        raise ValueError(f"Invalid geometry object: {e}")
+
+    try:
+        n_parts = multipolygon_geometry.GetGeometryCount()
+        if n_parts == 0:
+            raise ValueError("MultiPolygon has no parts")
+
+        exterior_coords_list = []
+
+        for i in range(n_parts):
+            # Get polygon part
+            polygon = multipolygon_geometry.GetGeometryRef(i)
+            if polygon is None:
+                continue  # Skip invalid parts
+
+            # Get exterior ring
+            ring = polygon.GetGeometryRef(0)
+            if ring is None:
+                continue  # Skip polygons without rings
+
+            n_points = ring.GetPointCount()
+            if n_points == 0:
+                continue  # Skip empty rings
+
+            # Extract coordinates for this polygon part
+            part_coords = []
+            for j in range(n_points):
+                point = ring.GetPoint(j)
+                part_coords.append((point[0], point[1]))
+
+            # Convert to numpy array
+            coords_array = np.array(part_coords)
+
+            # Ensure counter-clockwise order when requested
+            if enforce_ccw and not check_counter_clockwise(coords_array):
+                coords_array = coords_array[::-1]
+
+            exterior_coords_list.append(coords_array)
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract multipolygon coordinates: {e}")
+
+    if len(exterior_coords_list) == 0:
+        raise ValueError("No valid polygon parts found in multipolygon")
+
+    return exterior_coords_list
+
+
+def get_linestring_coords(linestring_geometry: ogr.Geometry) -> np.ndarray:
+    """Extract coordinates from a linestring geometry.
+
+    Parameters
+    ----------
+    linestring_geometry : ogr.Geometry
+        OGR LineString geometry object.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (n, 2) containing linestring vertex coordinates.
+
+    Raises
+    ------
+    ValueError
+        If geometry is not a valid linestring or has no points.
+    RuntimeError
+        If coordinate extraction fails.
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> line = ogr.Geometry(ogr.wkbLineString)
+    >>> line.AddPoint(0, 0)
+    >>> line.AddPoint(1, 1)
+    >>> coords = get_linestring_coords(line)
+    >>> coords.shape
+    (2, 2)
+    """
+    if linestring_geometry is None:
+        raise ValueError("LineString geometry cannot be None")
+
+    try:
+        n_points = linestring_geometry.GetPointCount()
+        if n_points == 0:
+            raise ValueError("LineString has no points")
+
+        # Extract coordinates using list comprehension
+        coords = [
+            (linestring_geometry.GetPoint(i)[0], linestring_geometry.GetPoint(i)[1])
+            for i in range(n_points)
+        ]
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract linestring coordinates: {e}")
+
+    return np.array(coords)
+
+
+def get_point_coords(point_geometry: ogr.Geometry) -> np.ndarray:
+    """Extract coordinates from a point geometry.
+
+    Parameters
+    ----------
+    point_geometry : ogr.Geometry
+        OGR Point geometry object.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (1, 2) containing the point coordinates.
+
+    Raises
+    ------
+    ValueError
+        If geometry is not a valid point.
+    RuntimeError
+        If coordinate extraction fails.
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> point = ogr.Geometry(ogr.wkbPoint)
+    >>> point.AddPoint(10.5, 20.3)
+    >>> coords = get_point_coords(point)
+    >>> coords.shape
+    (1, 2)
+    >>> coords[0]
+    array([10.5, 20.3])
+    """
+    if point_geometry is None:
+        raise ValueError("Point geometry cannot be None")
+
+    try:
+        point = point_geometry.GetPoint()
+        if point is None or len(point) < 2:
+            raise ValueError("Invalid point geometry")
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract point coordinates: {e}")
+
+    return np.array([(point[0], point[1])])
+
+
+def get_linearring_coords(linearring_geometry: ogr.Geometry) -> np.ndarray:
+    """Extract coordinates from a linear ring geometry.
+
+    Parameters
+    ----------
+    linearring_geometry : ogr.Geometry
+        OGR LinearRing geometry object.
+
+    Returns
+    -------
+    np.ndarray
+        Array of shape (n, 2) containing ring vertex coordinates.
+
+    Raises
+    ------
+    ValueError
+        If geometry is not a valid linear ring or has no points.
+    RuntimeError
+        If coordinate extraction fails.
+
+    Notes
+    -----
+    - A linear ring is a closed linestring (first point = last point)
+    - This function does not enforce CCW order (use for non-polygon contexts)
+
+    Examples
+    --------
+    >>> from osgeo import ogr
+    >>> ring = ogr.Geometry(ogr.wkbLinearRing)
+    >>> ring.AddPoint(0, 0)
+    >>> ring.AddPoint(1, 0)
+    >>> ring.AddPoint(1, 1)
+    >>> ring.AddPoint(0, 0)
+    >>> coords = get_linearring_coords(ring)
+    >>> coords.shape
+    (4, 2)
+    """
+    if linearring_geometry is None:
+        raise ValueError("LinearRing geometry cannot be None")
+
+    try:
+        n_points = linearring_geometry.GetPointCount()
+        if n_points == 0:
+            raise ValueError("LinearRing has no points")
+
+        # Extract coordinates using list comprehension
+        coords = [
+            (linearring_geometry.GetPoint(i)[0], linearring_geometry.GetPoint(i)[1])
+            for i in range(n_points)
+        ]
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to extract linear ring coordinates: {e}")
+
+    return np.array(coords)

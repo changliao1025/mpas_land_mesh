@@ -437,9 +437,6 @@ def write_wkt_to_vector_file(wkt, sFilename_out, iEPSG_in=4326):
     pDataset = None
 
 
-
-
-
 def remove_small_polygon(
     sFilename_vector_in: str,
     sFilename_vector_out: str,

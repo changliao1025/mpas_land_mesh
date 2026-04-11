@@ -7,7 +7,7 @@ class JigsawConfigManager:
     """Configuration manager for JIGSAW that handles defaults and serialization"""
 
     @staticmethod
-    def get_default_config():
+    def get_default_config() -> dict:
         """Returns a dictionary with all default JIGSAW configuration values"""
         return {
             # Grid resolution parameters
@@ -99,15 +99,15 @@ class JigsawConfigManager:
         }
 
     @staticmethod
-    def create_template_config(output_filename, custom_values=None):
+    def create_template_config(output_filename: str, custom_values: dict = None) -> dict:
         """Create a JIGSAW configuration file with default values, optionally customized
 
         Args:
-            output_filename (str or Path): Path to save the configuration file
-            custom_values (dict, optional): Dictionary of values to override defaults
+            output_filename: Path to save the configuration file
+            custom_values: Dictionary of values to override defaults
 
         Returns:
-            dict: The created configuration
+            The created configuration dictionary
         """
         # Get defaults
         config = JigsawConfigManager.get_default_config()
@@ -129,20 +129,28 @@ class JigsawConfigManager:
         return config
 
     @staticmethod
-    def load_config(filename):
+    def load_config(filename: str) -> dict:
         """Load a JIGSAW configuration from a JSON file
 
         Args:
-            filename (str or Path): Path to the configuration file
+            filename: Path to the configuration file
 
         Returns:
-            dict: The loaded configuration
+            The loaded configuration dictionary
         """
         with open(filename, "r") as f:
             return json.load(f)
 
-def create_jigsaw_template_configuration_file(sFilename_configuration_json, **kwargs):
-    """Generate JIGSAW config template file using parameter keywords"""
+def create_jigsaw_template_configuration_file(sFilename_configuration_json: str, **kwargs) -> dict:
+    """Generate JIGSAW config template file using parameter keywords
+
+    Args:
+        sFilename_configuration_json: Path to save the configuration file
+        **kwargs: Additional configuration parameters to override defaults
+
+    Returns:
+        The created configuration dictionary
+    """
 
     # Create the configuration
     config = JigsawConfigManager.create_template_config(
@@ -158,14 +166,27 @@ def create_jigsaw_template_configuration_file(sFilename_configuration_json, **kw
 
     return config
 
-def read_jigsaw_configuration_file(sFilename_configuration_in,
-                                   iFlag_standalone_in=1,
-    iFlag_create_directory_in=None,
-    iCase_index_in=None,
-    sModel_in="jigsaw",
-    sDate_in=None,
-    sWorkspace_output_in=None,):
-    """Read a JIGSAW configuration from a JSON file"""
+def read_jigsaw_configuration_file(sFilename_configuration_in: str,
+                                   iFlag_standalone_in: int = 1,
+    iFlag_create_directory_in: int = None,
+    iCase_index_in: int = None,
+    sModel_in: str = "jigsaw",
+    sDate_in: str = None,
+    sWorkspace_output_in: str = None):
+    """Read a JIGSAW configuration from a JSON file and create a jigsawcase object
+
+    Args:
+        sFilename_configuration_in: Path to the configuration JSON file
+        iFlag_standalone_in: Flag for standalone mode (default: 1)
+        iFlag_create_directory_in: Flag to create output directory
+        iCase_index_in: Case index number
+        sModel_in: Model name (default: "jigsaw")
+        sDate_in: Date string for the case
+        sWorkspace_output_in: Output workspace directory path
+
+    Returns:
+        jigsawcase object initialized with the configuration
+    """
 
     # Ensure input filenames are strings
     if isinstance(sFilename_configuration_in, Path):

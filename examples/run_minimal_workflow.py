@@ -6,6 +6,7 @@
 #you can change this to your preferred output directory
 import os
 import glob
+import logging
 from datetime import datetime
 from shutil import copy2
 
@@ -13,15 +14,20 @@ from shutil import copy2
 from mpas_land_mesh.utilities.change_json_key_value import change_json_key_value
 from mpas_land_mesh.utilities.vector import get_field_and_value, merge_features, add_field_to_vector_file
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster
+from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER, DRAINAGE_AREA_MULTIPLIER
 
 from mpas_land_mesh.preprocessing.river_networks import simplify_hydrorivers_networks
 from mpas_land_mesh.preprocessing.coastlines import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
 
 from mpas_land_mesh.utilities.config_manager import create_jigsaw_template_configuration_file, read_jigsaw_configuration_file
 
-
-
-
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 sDate_today = datetime.now().strftime('%Y%m%d')
 
 #things that may need to be changed for different runs
@@ -39,10 +45,10 @@ dResolution_river_network = 10
 dResolution_coastline = 10  #unit in km
 
 #for coastline
-dThreshold_area_island = dResolution_ocean * dResolution_ocean * 10 * 1.0E6  #unit m2, this one may need to be adjusted based on the resolution
+dThreshold_area_island = dResolution_ocean * dResolution_ocean * ISLAND_AREA_MULTIPLIER * KM2_TO_M2  #unit m2, this one may need to be adjusted based on the resolution
 dResolution_coastline_buffer = dResolution_coastline * 1.0E3  #buffer zone for coastline line
 #small island removal threshold
-dDrainage_area_threshold = dResolution_land * dResolution_land *100 * 1.0E6  #at least ten grid cells of drainage area, this may be adjusted as well
+dDrainage_area_threshold = dResolution_land * dResolution_land * DRAINAGE_AREA_MULTIPLIER * KM2_TO_M2  #at least 100 grid cells of drainage area, this may be adjusted as well
 
 #setup flags for debugging
 iFlag_simplify_hydrosheds_river_network = 0
@@ -104,10 +110,6 @@ sWorkspace_watershed_boundary_in = '/compyfs/liao313/00raw/hydrology/hydrosheds/
 #step 1: record attribute from the MPAS tools
 aField, aValue = get_field_and_value(sFilename_geojson_geometery_feature)
 
-#the river flowline simplficiation process already generated the basin configuration file
-sFilename_pyflowline_configuration = os.path.join(sWorkspace_river_network_output, 'pyflowline_configuration.json')
-sFilename_pyflowline_configuration_basins = os.path.join(sWorkspace_river_network_output, 'pyflowline_configuration_basins.json')
-
 sFilename_dam = '/compyfs/liao313/00raw/dam/GRanD_dams_v1_3_merged.geojson' #should consider both on and snapped dams in this dataset
 sFilename_river_network_raster = os.path.join(sWorkspace_river_network_output, 'river_network_raster.tif')
 if iFlag_simplify_hydrosheds_river_network == 1:
@@ -115,7 +117,6 @@ if iFlag_simplify_hydrosheds_river_network == 1:
                        sFilename_flowline_hydrosheds_out,
                        dDistance_tolerance,
                         dDrainage_area_threshold,
-                        iFlag_pyflowline_configuration_in=0,
                         nOutlet_largest=nOutlet_largest)
     convert_vector_to_global_raster(sFilename_flowline_hydrosheds_out, sFilename_river_network_raster,
                                          dResolution_x_in, dResolution_y_in )
@@ -209,4 +210,6 @@ if iFlag_debug == 1:
 else:
     pass
 
-print('Congratulations! The workflow has been completed successfully!')
+logger.info('='*80)
+logger.info('Workflow completed successfully!')
+logger.info('='*80)
