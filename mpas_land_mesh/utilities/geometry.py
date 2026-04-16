@@ -3,10 +3,8 @@ import math
 from typing import Union, Tuple, List, Optional
 import numpy as np
 from osgeo import osr, gdal, ogr
-
-from mpas_land_mesh.utilities.geometry  import (
-        calculate_distance_based_on_longitude_latitude
-    )
+#import NDArray
+from numpy.typing import NDArray
 
 from mpas_land_mesh.utilities.constants import earth_radius, IDL_TOLERANCE, IDL_OFFSET
 

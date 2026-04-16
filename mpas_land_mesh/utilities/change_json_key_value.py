@@ -25,6 +25,10 @@ def change_json_key_value(
     if isinstance(new_value, Path):
         new_value = str(new_value)
 
+    # Convert string "true"/"false" to actual booleans
+    if isinstance(new_value, str) and new_value.lower() in ("true", "false"):
+        new_value = new_value.lower() == "true"
+
     # Read the original JSON data
     with open(sFilename_json_in, "r") as file:
         data = json.load(file)
@@ -71,6 +75,10 @@ def change_json_keys_values(sFilename_json_in, key_value_pairs, iFlag_basin_in=N
         # Convert new_value to string if it's a Path object
         if isinstance(new_value, Path):
             new_value = str(new_value)
+
+        # Convert string "true"/"false" to actual booleans
+        if isinstance(new_value, str) and new_value.lower() in ("true", "false"):
+            new_value = new_value.lower() == "true"
 
         # Update the value associated with the specified key
         if iFlag_basin_in is None:

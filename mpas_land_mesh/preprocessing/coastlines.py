@@ -6,7 +6,7 @@ Simplified implementations for coastline operations
 
 import os
 import logging
-from osgeo import gdal, ogr
+from osgeo import gdal, ogr, osr
 from rtree.index import Index as RTreeindex
 import logging
 from pathlib import Path
@@ -854,9 +854,7 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
 
     for iFlowline in range(nFlowline):
         sFilename_flowline = aFilename_hydrosheds_flowline[iFlowline]
-
         logger.info(f'Processing flowline file {iFlowline + 1}/{nFlowline}: {os.path.basename(sFilename_flowline)}')
-
         # Open the flowline dataset
         pDataset_flowline = ogr.Open(sFilename_flowline)
         if pDataset_flowline is None:
