@@ -100,8 +100,9 @@ def simplify_hydrorivers_networks(
     sFilename_flowline_hydroshed_out: str,
     dDistance_tolerance_in: float,
     dDrainage_area_threshold_in: float,
-    nOutlet_largest: int = 10
-) -> int:
+    nOutlet_largest: int = 10,
+    iFlag_reuse_existing: int = 1
+) -> tuple:
     """
     Simplify hydrological river networks by merging nearby flowlines and filtering by drainage area.
 
@@ -118,7 +119,8 @@ def simplify_hydrorivers_networks(
         Path to input hydrographic flowline file (GeoJSON or ESRI Shapefile format).
         Expected to contain fields: HYRIV_ID, MAIN_RIV, ORD_STRA, UPLAND_SKM, NEXT_DOWN, ENDORHEIC.
     sFilename_flowline_hydroshed_out : str
-        Path to output simplified flowline GeoJSON file.
+        Path to output simplified flowline GeoJSON file (base name).
+        The actual filename will include the number of outlets processed.
     dDistance_tolerance_in : float
         Maximum distance (in meters) within which parallel flowlines are considered too close
         and one will be removed. Used for filtering closely-spaced flowlines.
@@ -128,11 +130,15 @@ def simplify_hydrorivers_networks(
     nOutlet_largest : int, optional
         Number of largest outlet basins to process and save detailed output (default is 10).
         Additional basins are processed but not saved individually.
+    iFlag_reuse_existing : int, optional
+        If 1 (default), reuse existing output files if they exist. If 0, always recompute.
 
     Returns
     -------
-    int
-        Actual number of largest outlet basins processed and saved.
+    tuple
+        (sFilename_out, nOutlet_actual) where:
+        - sFilename_out: Updated output filename including the actual number of outlets
+        - nOutlet_actual: Actual number of largest outlet basins processed and saved
 
     Output Files
     ------------
@@ -168,11 +174,49 @@ def simplify_hydrorivers_networks(
     ... )
     """
     dDrainage_area_threshold_ratio = 0.05
+
+    # Check if output already exists and reuse is enabled
+    if iFlag_reuse_existing == 1:
+        if os.path.exists(sFilename_flowline_hydroshed_out):
+            # Check for individual basin files to determine nOutlet_existing
+            sWorkspace_output = os.path.dirname(sFilename_flowline_hydroshed_out)
+            nOutlet_existing = 0
+            # Count how many basin files already exist
+            for i in range(1, 10000):  # Check up to a large number
+                sBasin = "{:04d}".format(i)
+                sFilename_basin = sFilename_flowline_hydroshed_out.replace('.geojson', '_'+sBasin + '.geojson')
+                if os.path.exists(sFilename_basin):
+                    nOutlet_existing = i
+                else:
+                    break
+
+            # Check if we have enough existing basin files
+            if nOutlet_existing >= nOutlet_largest:
+                # We have enough or more than requested - reuse existing data
+                logger.info('='*80)
+                logger.info('REUSING EXISTING RIVER NETWORK DATA')
+                logger.info('='*80)
+                logger.info(f'Found {nOutlet_existing} existing basin files')
+                logger.info(f'Requested {nOutlet_largest} largest basins')
+
+                # Use only the requested number
+                nOutlet_actual = nOutlet_largest
+                return sFilename_out, nOutlet_actual
+            elif nOutlet_existing > 0:
+                # We have some existing files but not enough
+                logger.info('='*80)
+                logger.info('INSUFFICIENT EXISTING DATA - RECOMPUTING')
+                logger.info('='*80)
+                logger.info(f'Found {nOutlet_existing} existing basin files')
+                logger.info(f'Requested {nOutlet_largest} largest basins')
+                logger.info(f'Need to recompute to generate {nOutlet_largest} basins')
+                logger.info('='*80)
+
     ### Simplify hydroshed flowlines
     #check file exists
     if not os.path.isfile(sFilename_flowline_hydroshed_in):
         logger.error(f'Input file does not exist: {sFilename_flowline_hydroshed_in}')
-        return 0
+        return sFilename_flowline_hydroshed_out, 0
     pDriver_geojson = ogr.GetDriverByName("GeoJSON")
     pDriver_shapefile = ogr.GetDriverByName("ESRI Shapefile")
 
@@ -833,8 +877,8 @@ def simplify_hydrorivers_networks(
         log_file.write(f"\nLogfile saved to: {sFilename_logfile}\n")
         log_file.write("=" * 80 + "\n")
 
-    logger.info(f'River name and drainage area logfile saved to: {sFilename_logfile}')
-    return nOutlet_actual
+
+    return sFilename_flowline_hydroshed_out, nOutlet_actual
 
 
 def get_outlet_location(sFilename_river_network: str) -> tuple:

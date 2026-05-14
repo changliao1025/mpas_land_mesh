@@ -34,7 +34,7 @@ sDate_today = datetime.now().strftime('%Y%m%d')
 sDate_today = '20260402'  #use a fixed date for easy repeatability
 sMesh_type = 'mpas'  #
 #index for different runs
-iCase_index = 1
+iCase_index = 2
 sModel = 'jigsaw'
 
 #resolution settings
@@ -51,11 +51,11 @@ dResolution_coastline_buffer = dResolution_coastline * 1.0E3  #buffer zone for c
 dDrainage_area_threshold = dResolution_land * dResolution_land * DRAINAGE_AREA_MULTIPLIER * KM2_TO_M2  #at least 100 grid cells of drainage area, this may be adjusted as well
 
 #setup flags for debugging
-iFlag_simplify_hydrosheds_river_network = 0
+iFlag_simplify_hydrosheds_river_network = 1
 iFlag_process_coastline = 1
 
 #number of largest outlet to be processed
-nOutlet_largest = 10
+nOutlet_largest = 100
 
 #thing may not need to be changed
 sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
@@ -113,11 +113,15 @@ aField, aValue = get_field_and_value(sFilename_geojson_geometery_feature)
 #sFilename_dam = '/compyfs/liao313/00raw/dam/GRanD_dams_v1_3_merged.geojson' #should consider both on and snapped dams in this dataset
 sFilename_river_network_raster = os.path.join(sWorkspace_river_network_output, 'river_network_raster.tif')
 if iFlag_simplify_hydrosheds_river_network == 1:
-    simplify_hydrorivers_networks(sFilename_flowline_hydrosheds_in,
+    sFilename_flowline_hydrosheds_out, nOutlet_actual = simplify_hydrorivers_networks(sFilename_flowline_hydrosheds_in,
                        sFilename_flowline_hydrosheds_out,
                        dDistance_tolerance,
                         dDrainage_area_threshold,
                         nOutlet_largest=nOutlet_largest)
+
+    logger.info(f'Processed {nOutlet_actual} largest outlet basins')
+    logger.info(f'Output filename: {sFilename_flowline_hydrosheds_out}')
+
     convert_vector_to_global_raster(sFilename_flowline_hydrosheds_out, sFilename_river_network_raster,
                                          dResolution_x_in, dResolution_y_in )
 else:
