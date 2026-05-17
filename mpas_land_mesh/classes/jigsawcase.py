@@ -3,7 +3,8 @@ import stat
 import json
 import datetime
 from pathlib import Path
-from mpas_land_mesh.utilities.system import get_python_environment
+from shutil import copy2
+from mpas_land_mesh.utilities.system import get_python_environment, get_extension_from_path
 #create a simple jigsaw run case class
 pDate = datetime.datetime.today()
 sDate_default = (
@@ -116,6 +117,9 @@ class jigsawcase:
         Creates the required subdirectories (tmp, out) inside
         self.sWorkspace_output so that run_jigsaw can write its
         intermediate and output files.
+
+        Also copies the land ocean mask to a GeoJSON file for record
+        if provided.
         """
         import jigsawpy
 
@@ -127,6 +131,10 @@ class jigsawcase:
             Path(os.path.join(self.sWorkspace_output, subdir)).mkdir(
                 parents=True, exist_ok=True
             )
+
+        # Copy land ocean mask to GeoJSON for record if provided
+        if self.sFilename_land_ocean_mask is not None:
+            self._convert_land_ocean_mask_to_geojson()
 
         # Verify jigsawpy is available and its binary is accessible
         try:
@@ -160,6 +168,65 @@ class jigsawcase:
             aConfig_in=aConfig,
         )
         return geom, gprj, mesh, mprj
+
+    def _convert_land_ocean_mask_to_geojson(self):
+        """Convert the land ocean mask to GeoJSON format for record.
+
+        This function follows the pattern from pyflowline's setup function,
+        copying the land ocean mask file to a GeoJSON file in the output
+        directory for record keeping.
+        """
+        if self.sFilename_land_ocean_mask is None:
+            return
+
+        sFilename_raw = self.sFilename_land_ocean_mask
+        sFilename_out = os.path.join(
+            str(Path(self.sWorkspace_output)), "land_ocean_mask.geojson"
+        )
+
+        # Check whether the file exists
+        if not os.path.isfile(sFilename_raw):
+            print(f"The land ocean mask file does not exist: {sFilename_raw}")
+            return
+
+        # Check the file type of the input file
+        sExtension = get_extension_from_path(sFilename_raw)
+
+        if sExtension == ".geojson" or sExtension == ".json":
+            # If already GeoJSON, just copy it
+            copy2(sFilename_raw, sFilename_out)
+            print(f"Copied land ocean mask to: {sFilename_out}")
+        else:
+            # For other formats (shapefile, etc.), use GDAL to convert
+            try:
+                from osgeo import ogr
+                # Open the input file
+                pDataset_in = ogr.Open(sFilename_raw, 0)
+
+                if pDataset_in is None:
+                    print(f"Could not open land ocean mask file: {sFilename_raw}")
+                    return
+
+                # Create GeoJSON output
+                pDriver_json = ogr.GetDriverByName("GeoJSON")
+                if os.path.exists(sFilename_out):
+                    pDriver_json.DeleteDataSource(sFilename_out)
+
+                pDataset_out = pDriver_json.CreateDataSource(sFilename_out)
+                pLayer_in = pDataset_in.GetLayer(0)
+
+                # Copy layer to GeoJSON
+                pDataset_out.CopyLayer(pLayer_in, "land_ocean_mask", ["OVERWRITE=YES"])
+
+                # Clean up
+                pDataset_in = None
+                pDataset_out = None
+
+                print(f"Converted land ocean mask to GeoJSON: {sFilename_out}")
+            except Exception as e:
+                print(f"Error converting land ocean mask to GeoJSON: {e}")
+
+        return
 
     def _jigsaw_create_hpc_job(self, sSlurm_in=None, hours_in=10):
         """Create a HPC job for this JIGSAW simulation.

@@ -201,7 +201,7 @@ def simplify_hydrorivers_networks(
 
                 # Use only the requested number
                 nOutlet_actual = nOutlet_largest
-                return sFilename_out, nOutlet_actual
+                return nOutlet_actual
             elif nOutlet_existing > 0:
                 # We have some existing files but not enough
                 logger.info('='*80)
@@ -216,7 +216,7 @@ def simplify_hydrorivers_networks(
     #check file exists
     if not os.path.isfile(sFilename_flowline_hydroshed_in):
         logger.error(f'Input file does not exist: {sFilename_flowline_hydroshed_in}')
-        return sFilename_flowline_hydroshed_out, 0
+        return 0
     pDriver_geojson = ogr.GetDriverByName("GeoJSON")
     pDriver_shapefile = ogr.GetDriverByName("ESRI Shapefile")
 
@@ -878,7 +878,7 @@ def simplify_hydrorivers_networks(
         log_file.write("=" * 80 + "\n")
 
 
-    return sFilename_flowline_hydroshed_out, nOutlet_actual
+    return nOutlet_actual
 
 
 def get_outlet_location(sFilename_river_network: str) -> tuple:
