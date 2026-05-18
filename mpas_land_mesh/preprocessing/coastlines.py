@@ -23,6 +23,7 @@ from mpas_land_mesh.utilities.vector import (
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster, create_raster_buffer_zone, fix_raster_antimeridian_issue
 from mpas_land_mesh.utilities.geometry import calculate_distance_based_on_longitude_latitude
 from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
+from pyearthbuffer.utility.create_gcs_buffer_zone import create_buffer_zone_polygon_file
 
 gdal.UseExceptions()
 
@@ -753,6 +754,13 @@ def create_land_ocean_mask_from_naturalearth(sWorkspace_coastline_output: str,
     sFilename_vector_coastline = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island.geojson')
     remove_small_polygon(sFilename_naturalearth, sFilename_vector_coastline, dThreshold_area_island )
 
+    #special treatment, buffer will create issue for some sea areas, so must be used carefully
+    #if dResolution_coastline_buffer > 0:
+    #    sFilename_geojson_buffer = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_buffer.geojson')
+    #    create_buffer_zone_polygon_file(sFilename_vector_coastline, sFilename_geojson_buffer,
+    #                                      dBuffer_distance_in = dResolution_coastline_buffer )
+    #    sFilename_vector_coastline = sFilename_geojson_buffer
+
     sFilename_tif_wo_island = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island.tif')
     convert_vector_to_global_raster(sFilename_vector_coastline,
                                     sFilename_tif_wo_island,
@@ -792,8 +800,8 @@ def geometries_bbox_overlap(bbox1: tuple, bbox2: tuple, tolerance: float = 1e-10
 
 
 def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: list,
-                                                 sFilename_vector_naturalearth: str,
-                                                 sFilename_vector_naturalearth_updated: str) -> None:
+                                                sFilename_vector_naturalearth: str,
+                                                sFilename_vector_naturalearth_updated: str) -> None:
     """
     Fix incompatibility between Natural Earth land polygons and HydroSHEDS flowlines.
 
@@ -943,6 +951,8 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
                                     #create a geometry from the buffer wkt
                                     pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
                                     aBuffer_geometries.append(pBuffer_geometry)
+                            else:
+                                print(f'Warning: Unexpected geometry type for outside flowline part: {sGeometry_type}, skipping buffer creation')
                         #use this distance to create a circle geometry as buffer
                         pass
 

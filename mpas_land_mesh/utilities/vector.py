@@ -10,6 +10,7 @@ import logging
 import time
 from typing import Union, Optional, Tuple
 import numpy as np
+import osgeo
 from osgeo import ogr, osr, gdal
 
 from functools import lru_cache
@@ -42,6 +43,20 @@ SUPPORTED_VECTOR_FORMATS = {
 }
 
 
+# Geometry type mapping: normalises multi/2.5D types to simple 2D equivalents.
+# Used internally by convert_geojson_to_parquet.
+_GEOMETRY_TYPE_MAPPING = {
+    ogr.wkbPoint: ogr.wkbPoint,
+    ogr.wkbLineString: ogr.wkbLineString,
+    ogr.wkbLineString25D: ogr.wkbLineString,
+    ogr.wkbPolygon: ogr.wkbPolygon,
+    ogr.wkbMultiPoint: ogr.wkbPoint,
+    ogr.wkbMultiLineString: ogr.wkbLineString,
+    ogr.wkbMultiLineString25D: ogr.wkbLineString,
+    ogr.wkbMultiPolygon: ogr.wkbPolygon,
+}
+
+
 __all__ = [
     "SUPPORTED_VECTOR_FORMATS",
     "gdal_vector_format_support",
@@ -54,6 +69,7 @@ __all__ = [
     "get_extension_from_vector_format",
     "check_parquet_support",
     "has_parquet_support",
+    "convert_vector_format",
 ]
 
 
@@ -280,6 +296,293 @@ def has_parquet_support() -> bool:
     return check_parquet_support() is not None
 
 
+def _get_output_geometry_type(input_geom_type: int) -> int:
+    """Map an OGR geometry type to a simple 2-D output type.
+
+    Converts multi-geometry and 2.5D/3D variants to their plain 2-D
+    single-geometry equivalents (e.g. ``wkbMultiPolygon`` → ``wkbPolygon``,
+    ``wkbLineString25D`` → ``wkbLineString``).
+
+    Parameters
+    ----------
+    input_geom_type : int
+        OGR geometry type constant (e.g. ``ogr.wkbPolygon``).
+
+    Returns
+    -------
+    int
+        Normalised OGR geometry type constant.
+
+    Raises
+    ------
+    ValueError
+        If *input_geom_type* is not present in the internal mapping table.
+    """
+    if input_geom_type in _GEOMETRY_TYPE_MAPPING:
+        return _GEOMETRY_TYPE_MAPPING[input_geom_type]
+    geom_name = ogr.GeometryTypeToName(input_geom_type)
+    raise ValueError(f"Unsupported geometry type: {geom_name} ({input_geom_type})")
+
+
+def convert_vector_format(
+    sFilename_vector_in: str,
+    sFilename_vector_out: str,
+    target_epsg: Optional[int] = None,
+) -> bool:
+    """Convert a vector file between any two GDAL-supported formats.
+
+    Both input and output formats are auto-detected from file extensions
+    (see :data:`SUPPORTED_VECTOR_FORMATS`).  An optional coordinate-system
+    transformation can be applied; when no *target_epsg* is given the
+    original CRS is preserved.
+
+    Common use-cases
+    ----------------
+    * Any format → GeoParquet (``.parquet``) for visualisation.
+    * Any format → GeoJSON (``.geojson``) for record-keeping / web use.
+    * Shapefile → GeoPackage, etc.
+
+    Parameters
+    ----------
+    sFilename_vector_in : str
+        Path to the input vector file.  Format is auto-detected from the
+        file extension (e.g. ``*.geojson``, ``*.shp``, ``*.gpkg``).
+    sFilename_vector_out : str
+        Path for the output file.  Format is auto-detected from the
+        extension (e.g. ``*.parquet``, ``*.geojson``, ``*.gpkg``).
+        Any existing file at this path is removed before writing.
+    target_epsg : int, optional
+        EPSG code to reproject the data into.  When *None* (default) the
+        input CRS is preserved in the output.
+
+    Returns
+    -------
+    bool
+        ``True`` on success, ``False`` if any error occurred.
+
+    Raises
+    ------
+    FileNotFoundError
+        Logged (not raised) when the input file does not exist.
+    RuntimeError
+        Logged (not raised) for GDAL-level failures.
+
+    Notes
+    -----
+    * Parquet output requires GDAL ≥ 3.5 built with Arrow/Parquet support.
+      Call :func:`has_parquet_support` to check availability before use.
+    * Geometry types are normalised to simple 2-D equivalents
+      (e.g. ``MultiPolygon`` → ``Polygon``) for broad driver compatibility.
+    * For GDAL ≥ 3, axis mapping is forced to traditional GIS order
+      (longitude, latitude) to avoid coordinate-swap issues.
+    * Features are processed one at a time (streaming), so memory usage
+      is independent of dataset size.
+
+    Examples
+    --------
+    Convert GeoJSON to GeoParquet:
+
+    >>> from mpas_land_mesh.utilities.vector import convert_vector_format
+    >>> ok = convert_vector_format('mesh.geojson', 'mesh.parquet')
+    >>> print(ok)
+    True
+
+    Convert any format to GeoJSON (e.g. for record-keeping):
+
+    >>> ok = convert_vector_format('mask.shp', 'mask.geojson')
+
+    Reproject while converting:
+
+    >>> ok = convert_vector_format('mesh.geojson', 'mesh_mercator.parquet', target_epsg=3857)
+    """
+    logger = logging.getLogger(__name__)
+
+    # ------------------------------------------------------------------
+    # Validate input
+    # ------------------------------------------------------------------
+    if not os.path.exists(sFilename_vector_in):
+        logger.error(f"Input file not found: {sFilename_vector_in}")
+        return False
+
+    # ------------------------------------------------------------------
+    # Resolve input / output formats and drivers
+    # ------------------------------------------------------------------
+    try:
+        format_in = get_vector_format_from_filename(sFilename_vector_in)
+        format_out = get_vector_format_from_filename(sFilename_vector_out)
+        driver_out = get_vector_driver_from_filename(sFilename_vector_out)
+    except ValueError as exc:
+        logger.error(f"Unsupported file format: {exc}")
+        return False
+
+    if driver_out is None:
+        logger.error(f"Could not obtain OGR driver for output format '{format_out}'")
+        return False
+
+    logger.info(f"Converting from {format_in} to {format_out}")
+    logger.info(f"Input : {sFilename_vector_in}")
+    logger.info(f"Output: {sFilename_vector_out}")
+
+    # ------------------------------------------------------------------
+    # Remove existing output file
+    # ------------------------------------------------------------------
+    if os.path.exists(sFilename_vector_out):
+        os.remove(sFilename_vector_out)
+        logger.info(f"Removed existing output file: {sFilename_vector_out}")
+
+    # ------------------------------------------------------------------
+    # Open input dataset
+    # ------------------------------------------------------------------
+    pDataset_in = ogr.Open(sFilename_vector_in, 0)
+    if pDataset_in is None:
+        logger.error(f"Could not open input file: {sFilename_vector_in}")
+        return False
+
+    pLayer_in = pDataset_in.GetLayer()
+    if pLayer_in is None:
+        logger.error("Could not access layer in input file")
+        pDataset_in = None
+        return False
+
+    nFeature_count = pLayer_in.GetFeatureCount()
+    logger.info(f"Input contains {nFeature_count} features")
+
+    # ------------------------------------------------------------------
+    # Determine coordinate transformation
+    # ------------------------------------------------------------------
+    pSrs_in = pLayer_in.GetSpatialRef()
+    iFlag_transform = 0
+    transform = None
+    pSrs_out = None
+
+    if target_epsg is not None:
+        pSrs_out = osr.SpatialReference()
+        pSrs_out.ImportFromEPSG(target_epsg)
+        logger.info(f"Target CRS: EPSG:{target_epsg} (explicit)")
+
+        if pSrs_in is None:
+            logger.warning("Input has no spatial reference; skipping transformation")
+        else:
+            wkt_in = pSrs_in.ExportToWkt()
+            wkt_out = pSrs_out.ExportToWkt()
+            if wkt_in != wkt_out:
+                iFlag_transform = 1
+                logger.info("Coordinate transformation required")
+                # GDAL 3+ axis-order fix
+                if int(osgeo.__version__[0]) >= 3:
+                    pSrs_in.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+                    pSrs_out.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+                transform = osr.CoordinateTransformation(pSrs_in, pSrs_out)
+            else:
+                logger.info("No coordinate transformation needed (same CRS)")
+    else:
+        # Preserve original CRS
+        pSrs_out = pSrs_in
+        logger.info("Preserving original CRS")
+
+    # ------------------------------------------------------------------
+    # Determine output geometry type from first feature
+    # ------------------------------------------------------------------
+    pLayer_in.ResetReading()
+    pFeature_peek = pLayer_in.GetNextFeature()
+    if pFeature_peek is None:
+        logger.error("Layer contains no features")
+        pDataset_in = None
+        return False
+
+    pGeometry_peek = pFeature_peek.GetGeometryRef()
+    if pGeometry_peek is None:
+        logger.error("First feature has no geometry")
+        pDataset_in = None
+        return False
+
+    iGeomType_in = pGeometry_peek.GetGeometryType()
+    logger.info(f"Input geometry type: {ogr.GeometryTypeToName(iGeomType_in)}")
+
+    try:
+        iGeomType_out = _get_output_geometry_type(iGeomType_in)
+    except ValueError as exc:
+        logger.warning(f"Geometry type mapping failed: {exc}; using original type")
+        iGeomType_out = iGeomType_in
+
+    # Promote to 3-D output type when input carries Z-coordinates
+    if pGeometry_peek.GetCoordinateDimension() == 3:
+        logger.info("Input geometry contains Z-coordinates (3D)")
+        _3d_map = {
+            ogr.wkbPoint: ogr.wkbPoint25D,
+            ogr.wkbLineString: ogr.wkbLineString25D,
+            ogr.wkbPolygon: ogr.wkbPolygon25D,
+        }
+        iGeomType_out = _3d_map.get(iGeomType_out, iGeomType_out)
+
+    logger.info(f"Output geometry type: {ogr.GeometryTypeToName(iGeomType_out)}")
+
+    # ------------------------------------------------------------------
+    # Create output dataset and layer
+    # ------------------------------------------------------------------
+    pDataset_out = driver_out.CreateDataSource(sFilename_vector_out)
+    if pDataset_out is None:
+        logger.error(f"Could not create output file: {sFilename_vector_out}")
+        pDataset_in = None
+        return False
+
+    pLayer_out = pDataset_out.CreateLayer("layer", pSrs_out, geom_type=iGeomType_out)
+    if pLayer_out is None:
+        logger.error("Could not create output layer")
+        pDataset_in = None
+        pDataset_out = None
+        return False
+
+    # Copy field definitions
+    pFeatureDefn_in = pLayer_in.GetLayerDefn()
+    for i in range(pFeatureDefn_in.GetFieldCount()):
+        pLayer_out.CreateField(pFeatureDefn_in.GetFieldDefn(i))
+
+    # ------------------------------------------------------------------
+    # Stream features from input to output
+    # ------------------------------------------------------------------
+    logger.info(f"Processing {nFeature_count} features...")
+    pLayer_in.ResetReading()
+    nProcessed = 0
+
+    for pFeature_in in pLayer_in:
+        pGeometry = pFeature_in.GetGeometryRef()
+
+        if pGeometry is None:
+            logger.warning(f"Feature {nProcessed} has no geometry, skipping")
+            continue
+
+        if iFlag_transform:
+            try:
+                pGeometry.Transform(transform)
+            except Exception as exc:
+                logger.warning(f"Failed to transform feature {nProcessed}: {exc}, skipping")
+                continue
+
+        pFeature_out = ogr.Feature(pLayer_out.GetLayerDefn())
+        pFeature_out.SetGeometry(pGeometry)
+
+        for i in range(pFeatureDefn_in.GetFieldCount()):
+            pFeature_out.SetField(i, pFeature_in.GetField(i))
+
+        pLayer_out.CreateFeature(pFeature_out)
+        pFeature_out = None
+        nProcessed += 1
+
+        if nProcessed % 1000 == 0:
+            logger.info(f"Processed {nProcessed}/{nFeature_count} features")
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+    pDataset_in = None
+    pLayer_out = None
+    pDataset_out = None
+
+    logger.info(f"Conversion complete: {nProcessed} features written to {sFilename_vector_out}")
+    return True
+
+
 def get_field_and_value(sFilename_in):
     """
     Extract field names and values from the first feature of a vector file
@@ -365,8 +668,8 @@ def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
         iFlag_force (bool): Overwrite existing output file
     """
     if os.path.exists(sFilename_out) and not iFlag_force:
-        print(f"Output file {sFilename_out} already exists")
-        return
+        print(f"Warning: Output file {sFilename_out} already exists and will be overwritten")
+        os.remove(sFilename_out)
 
     pDataset_in = ogr.Open(sFilename_in, 0)
     if pDataset_in is None:

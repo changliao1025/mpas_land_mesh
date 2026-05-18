@@ -3,8 +3,8 @@ import stat
 import json
 import datetime
 from pathlib import Path
-from shutil import copy2
 from mpas_land_mesh.utilities.system import get_python_environment, get_extension_from_path
+from mpas_land_mesh.utilities.vector import convert_vector_format
 #create a simple jigsaw run case class
 pDate = datetime.datetime.today()
 sDate_default = (
@@ -172,9 +172,9 @@ class jigsawcase:
     def _convert_land_ocean_mask_to_geojson(self):
         """Convert the land ocean mask to GeoJSON format for record.
 
-        This function follows the pattern from pyflowline's setup function,
-        copying the land ocean mask file to a GeoJSON file in the output
-        directory for record keeping.
+        Uses :func:`~mpas_land_mesh.utilities.vector.convert_vector_format`
+        to convert any GDAL-supported input format (shapefile, GeoPackage,
+        existing GeoJSON, etc.) to a GeoJSON file in the output directory.
         """
         if self.sFilename_land_ocean_mask is None:
             return
@@ -184,47 +184,15 @@ class jigsawcase:
             str(Path(self.sWorkspace_output)), "land_ocean_mask.geojson"
         )
 
-        # Check whether the file exists
         if not os.path.isfile(sFilename_raw):
             print(f"The land ocean mask file does not exist: {sFilename_raw}")
             return
 
-        # Check the file type of the input file
-        sExtension = get_extension_from_path(sFilename_raw)
-
-        if sExtension == ".geojson" or sExtension == ".json":
-            # If already GeoJSON, just copy it
-            copy2(sFilename_raw, sFilename_out)
-            print(f"Copied land ocean mask to: {sFilename_out}")
+        ok = convert_vector_format(sFilename_raw, sFilename_out)
+        if ok:
+            print(f"Converted land ocean mask to GeoJSON: {sFilename_out}")
         else:
-            # For other formats (shapefile, etc.), use GDAL to convert
-            try:
-                from osgeo import ogr
-                # Open the input file
-                pDataset_in = ogr.Open(sFilename_raw, 0)
-
-                if pDataset_in is None:
-                    print(f"Could not open land ocean mask file: {sFilename_raw}")
-                    return
-
-                # Create GeoJSON output
-                pDriver_json = ogr.GetDriverByName("GeoJSON")
-                if os.path.exists(sFilename_out):
-                    pDriver_json.DeleteDataSource(sFilename_out)
-
-                pDataset_out = pDriver_json.CreateDataSource(sFilename_out)
-                pLayer_in = pDataset_in.GetLayer(0)
-
-                # Copy layer to GeoJSON
-                pDataset_out.CopyLayer(pLayer_in, "land_ocean_mask", ["OVERWRITE=YES"])
-
-                # Clean up
-                pDataset_in = None
-                pDataset_out = None
-
-                print(f"Converted land ocean mask to GeoJSON: {sFilename_out}")
-            except Exception as e:
-                print(f"Error converting land ocean mask to GeoJSON: {e}")
+            print(f"Failed to convert land ocean mask to GeoJSON: {sFilename_raw}")
 
         return
 

@@ -9,6 +9,7 @@ from mpas_land_mesh.utilities.geometry import (
     convert_360_to_180,
     split_international_date_line_polygon_coordinates,
 )
+from mpas_land_mesh.utilities.vector import convert_vector_format
 
 gdal.UseExceptions()
 
@@ -649,6 +650,10 @@ def create_mpas_mesh(
         pFeature = None
         pLayer = None
         pDataset = None
+
+        # Convert the GeoJSON mesh to GeoParquet for easier visualization
+        sFilename_parquet = os.path.splitext(sFilename_output_in)[0] + ".parquet"
+        convert_vector_format(sFilename_output_in, sFilename_parquet)
 
     # For regional meshes, filter out cells whose neighbors are not in the domain
     if iFlag_global == 1:

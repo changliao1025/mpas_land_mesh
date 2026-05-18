@@ -40,7 +40,7 @@ sDate_today = datetime.now().strftime('%Y%m%d')
 sDate_today = '20260402'  #use a fixed date for easy repeatability
 sMesh_type = 'mpas'  #
 #index for different runs
-iCase_index = 3
+iCase_index = 4
 sModel = 'jigsaw'
 #flag for component
 
@@ -157,6 +157,7 @@ if iFlag_process_coastline == 1:
                                                                              dResolution_coastline_buffer,
                                                                              iRaster_buffer_pixel = 2)
 
+
     ##we need to fix the incompatibilty between hydrosheds and naturalearth
     aFilename_flowline = list()
     for i in range(1, nOutlet_largest+1):
@@ -166,8 +167,8 @@ if iFlag_process_coastline == 1:
 
     sFilename_vector_coastline_updated = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_fixed.geojson')
     fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_updated )
-    #should be merged into one single function
-    merge_features(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged, iFlag_force= True)
+    #copy the updated coastline file to the merged coastline file for jigsaw mesh generation
+    copy2(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged)
     add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
 else:
     #reuse
