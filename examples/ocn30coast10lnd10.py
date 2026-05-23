@@ -37,15 +37,15 @@ logger = logging.getLogger(__name__)
 sDate_today = datetime.now().strftime('%Y%m%d')
 
 #things that may need to be changed for different runs
-sDate_today = '20260402'  #use a fixed date for easy repeatability
+sDate_today = '20260601'  #use a fixed date for easy repeatability
 sMesh_type = 'mpas'  #
 #index for different runs
-iCase_index = 4
+iCase_index = 1
 sModel = 'jigsaw'
 #flag for component
 
 iFlag_simplify_hydrosheds_river_network = 0
-iFlag_process_coastline = 0
+iFlag_process_coastline = 1
 
 #resolution settings
 
@@ -166,9 +166,8 @@ if iFlag_process_coastline == 1:
         aFilename_flowline.append(sFilename_flowline_simplified_basin)
 
     sFilename_vector_coastline_updated = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_fixed.geojson')
-    fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_updated )
+    fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_merged )
     #copy the updated coastline file to the merged coastline file for jigsaw mesh generation
-    copy2(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged)
     add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
 else:
     #reuse

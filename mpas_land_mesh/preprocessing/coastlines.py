@@ -18,6 +18,7 @@ from mpas_land_mesh.utilities.vector import (
     get_vector_driver_from_filename,
     get_vector_format_from_filename,
     remove_small_polygon,
+    remove_internal_polygon,
     merge_features
 )
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster, create_raster_buffer_zone, fix_raster_antimeridian_issue
@@ -754,6 +755,9 @@ def create_land_ocean_mask_from_naturalearth(sWorkspace_coastline_output: str,
     sFilename_vector_coastline = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island.geojson')
     remove_small_polygon(sFilename_naturalearth, sFilename_vector_coastline, dThreshold_area_island )
 
+    sFilename_vector_coastline_wo_internal_ring = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_removed_internal.geojson')
+    remove_internal_polygon(sFilename_vector_coastline, sFilename_vector_coastline_wo_internal_ring)
+
     #special treatment, buffer will create issue for some sea areas, so must be used carefully
     #if dResolution_coastline_buffer > 0:
     #    sFilename_geojson_buffer = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_buffer.geojson')
@@ -762,7 +766,7 @@ def create_land_ocean_mask_from_naturalearth(sWorkspace_coastline_output: str,
     #    sFilename_vector_coastline = sFilename_geojson_buffer
 
     sFilename_tif_wo_island = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island.tif')
-    convert_vector_to_global_raster(sFilename_vector_coastline,
+    convert_vector_to_global_raster(sFilename_vector_coastline_wo_internal_ring,
                                     sFilename_tif_wo_island,
                                     dResolution_x_in,
                                     dResolution_y_in,
@@ -781,7 +785,7 @@ def create_land_ocean_mask_from_naturalearth(sWorkspace_coastline_output: str,
         sFilename_tif_wo_island_buffered_fixed = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_buffered_fixed.tif')
         fix_raster_antimeridian_issue(sFilename_tif_wo_island, sFilename_tif_wo_island_buffered_fixed, 1, 2, 0)
 
-    return sFilename_tif_wo_island_buffered_fixed, sFilename_vector_coastline
+    return sFilename_tif_wo_island_buffered_fixed, sFilename_vector_coastline_wo_internal_ring
 
 
 def geometries_bbox_overlap(bbox1: tuple, bbox2: tuple, tolerance: float = 1e-10) -> bool:
@@ -817,6 +821,10 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
     Returns:
         None
     """
+
+    if os.path.exists(sFilename_vector_naturalearth_updated):
+        os.remove(sFilename_vector_naturalearth_updated)
+        logger.info(f"Removed existing updated Natural Earth file: {sFilename_vector_naturalearth_updated}")
 
     nFlowline = len(aFilename_hydrosheds_flowline)
 
@@ -860,6 +868,43 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
     # Create a list to store buffer geometries for flowlines outside land
     aBuffer_geometries = []
 
+    # -----------------------------------------------------------------------
+    # Debug: prepare a directory and GeoJSON dataset to collect all
+    # outside_flowline segments so they can be inspected in a GIS viewer.
+    # -----------------------------------------------------------------------
+    sWorkspace_debug = os.path.join(os.path.dirname(sFilename_vector_naturalearth),
+                                    'debug_outside_flowlines')
+    os.makedirs(sWorkspace_debug, exist_ok=True)
+    sFilename_debug_flowlines = os.path.join(sWorkspace_debug, 'outside_flowlines.geojson')
+    sFilename_debug_buffers   = os.path.join(sWorkspace_debug, 'outside_flowline_buffers.geojson')
+
+    pDriver_debug = ogr.GetDriverByName('GeoJSON')
+    pSrs_debug = osr.SpatialReference()
+    pSrs_debug.ImportFromEPSG(4326)
+
+    # Remove stale debug files from previous runs
+    for _f in (sFilename_debug_flowlines, sFilename_debug_buffers):
+        if os.path.exists(_f):
+            pDriver_debug.DeleteDataSource(_f)
+
+    pDataset_debug_fl  = pDriver_debug.CreateDataSource(sFilename_debug_flowlines)
+    pLayer_debug_fl    = pDataset_debug_fl.CreateLayer('outside_flowlines', pSrs_debug,
+                                                        ogr.wkbLineString)
+    # Add informational fields
+    pLayer_debug_fl.CreateField(ogr.FieldDefn('flowline_file', ogr.OFTString))
+    pLayer_debug_fl.CreateField(ogr.FieldDefn('segment_idx',   ogr.OFTInteger))
+    pLayer_debug_fl.CreateField(ogr.FieldDefn('geom_type',     ogr.OFTString))
+    pLayer_debug_fl.CreateField(ogr.FieldDefn('distance_m',    ogr.OFTReal))
+
+    pDataset_debug_buf = pDriver_debug.CreateDataSource(sFilename_debug_buffers)
+    pLayer_debug_buf   = pDataset_debug_buf.CreateLayer('outside_flowline_buffers', pSrs_debug,
+                                                         ogr.wkbPolygon)
+    pLayer_debug_buf.CreateField(ogr.FieldDefn('flowline_file', ogr.OFTString))
+    pLayer_debug_buf.CreateField(ogr.FieldDefn('segment_idx',   ogr.OFTInteger))
+    pLayer_debug_buf.CreateField(ogr.FieldDefn('distance_m',    ogr.OFTReal))
+
+    logger.info(f'Debug outside-flowline files will be written to: {sWorkspace_debug}')
+
     for iFlowline in range(nFlowline):
         sFilename_flowline = aFilename_hydrosheds_flowline[iFlowline]
         logger.info(f'Processing flowline file {iFlowline + 1}/{nFlowline}: {os.path.basename(sFilename_flowline)}')
@@ -877,6 +922,7 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
         # Process each flowline feature
         nFlowline_features = pLayer_flowline.GetFeatureCount()
         nOutside_count = 0
+        sFlowline_basename = os.path.basename(sFilename_flowline)
 
         for pFeature_flowline in pLayer_flowline:
             pGeometry_flowline = pFeature_flowline.GetGeometryRef()
@@ -895,74 +941,196 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
             candidate_indices = list(land_spatial_index.intersection(query_bbox))
 
 
-            # Check if flowline intersects with any candidate land polygon
+            # Progressively subtract every intersecting land polygon so the
+            # final remainder captures ALL outside segments, not just the last.
             bIntersects_land = False
-
-            # Start with the original flowline
             whole_flowline = pGeometry_flowline.Clone()
+            whole_flowline.FlattenTo2D()
 
             for candidate_idx in candidate_indices:
                 if candidate_idx >= len(land_geometries):
                     continue
+                if whole_flowline is None or whole_flowline.IsEmpty():
+                    break
 
                 pGeometry_land = land_geometries[candidate_idx]
                 if pGeometry_land is None:
                     continue
 
-                # Check if flowline intersects with land polygon
                 if whole_flowline.Intersects(pGeometry_land):
                     bIntersects_land = True
-                    # Get the part of flowline that is outside this land polygon
+                    # Subtract this land polygon and keep the outside remainder
+                    # for the next iteration (progressive subtraction).
                     outside_part = whole_flowline.Difference(pGeometry_land)
                     if outside_part is not None and not outside_part.IsEmpty():
-                        # Update remaining flowline to only the outside part
-                        outside_flowline = outside_part.Clone()
-                        # Check if the outside part has significant length
-                        outside_flowline.FlattenTo2D()
-                        sGeometry_type = outside_flowline.GetGeometryName()
-                        if sGeometry_type == 'LINESTRING':
-                            nOutside_count += 1
-                            sWkt= outside_flowline.ExportToWkt()
-                            #calcuate the length of the outside_part to determine the buffer distance
-                            point_start = outside_flowline.GetPoint(0)
-                            point_end = outside_flowline.GetPoint(outside_flowline.GetPointCount() - 1)
-                            distance = calculate_distance_based_on_longitude_latitude(point_start[0], point_start[1], point_end[0], point_end[1])
-                            # Use midpoint latitude for accurate buffer distance conversion
-                            reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                            sWkt_buffer_polygon = create_wkt_buffer_distance(sWkt, distance/2.0, epsg=4326, reference_latitude=reference_latitude)
-                            #create a geometry from the buffer wkt
-                            pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
-                            aBuffer_geometries.append(pBuffer_geometry)
-                        else:
-                            if sGeometry_type == 'MULTILINESTRING':
-                                for i in range(outside_flowline.GetGeometryCount()):
-                                    outside_part_i = outside_flowline.GetGeometryRef(i)
-                                    if outside_part_i is None or outside_part_i.IsEmpty():
-                                        continue
-                                    nOutside_count += 1
-                                    sWkt= outside_part_i.ExportToWkt()
-                                    point_start = outside_part_i.GetPoint(0)
-                                    point_end = outside_part_i.GetPoint(outside_part_i.GetPointCount() - 1)
-                                    distance = calculate_distance_based_on_longitude_latitude(point_start[0], point_start[1], point_end[0], point_end[1])
-                                    #calcuate the length of the outside_part to determine the buffer distance
-                                    # Use midpoint latitude for accurate buffer distance conversion
-                                    reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                                    sWkt_buffer_polygon = create_wkt_buffer_distance(sWkt, distance/2.0, epsg=4326, reference_latitude=reference_latitude)
-                                    #create a geometry from the buffer wkt
-                                    pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
-                                    aBuffer_geometries.append(pBuffer_geometry)
-                            else:
-                                print(f'Warning: Unexpected geometry type for outside flowline part: {sGeometry_type}, skipping buffer creation')
-                        #use this distance to create a circle geometry as buffer
-                        pass
+                        outside_part.FlattenTo2D()
+                        whole_flowline = outside_part   # <-- update for next iteration
+                    else:
+                        whole_flowline = None
+                        break
 
-                # If bIntersects_land is True but no outside_flowline_parts,
-                # it means the entire flowline is inside land polygons - no buffer needed
+            # Process the final outside remainder after all land polygons are subtracted
+            if bIntersects_land and whole_flowline is not None and not whole_flowline.IsEmpty():
+                outside_flowline = whole_flowline
+                sGeometry_type = outside_flowline.GetGeometryName()
+
+                if sGeometry_type == 'LINESTRING':
+                    nOutside_count += 1
+                    sWkt = outside_flowline.ExportToWkt()
+                    point_start = outside_flowline.GetPoint(0)
+                    point_end   = outside_flowline.GetPoint(outside_flowline.GetPointCount() - 1)
+                    distance = calculate_distance_based_on_longitude_latitude(
+                        point_start[0], point_start[1], point_end[0], point_end[1])
+                    reference_latitude = (point_start[1] + point_end[1]) / 2.0
+                    sWkt_buffer_polygon = create_wkt_buffer_distance(
+                        sWkt, distance / 2.0, epsg=4326, reference_latitude=reference_latitude)
+                    pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
+                    aBuffer_geometries.append(pBuffer_geometry)
+
+                    # --- debug ---
+                    _pFeat_fl = ogr.Feature(pLayer_debug_fl.GetLayerDefn())
+                    _pFeat_fl.SetGeometry(outside_flowline.Clone())
+                    _pFeat_fl.SetField('flowline_file', sFlowline_basename)
+                    _pFeat_fl.SetField('segment_idx',   nOutside_count)
+                    _pFeat_fl.SetField('geom_type',     sGeometry_type)
+                    _pFeat_fl.SetField('distance_m',    distance)
+                    pLayer_debug_fl.CreateFeature(_pFeat_fl)
+                    _pFeat_fl = None
+
+                    _pFeat_buf = ogr.Feature(pLayer_debug_buf.GetLayerDefn())
+                    _pFeat_buf.SetGeometry(pBuffer_geometry.Clone())
+                    _pFeat_buf.SetField('flowline_file', sFlowline_basename)
+                    _pFeat_buf.SetField('segment_idx',   nOutside_count)
+                    _pFeat_buf.SetField('distance_m',    distance)
+                    pLayer_debug_buf.CreateFeature(_pFeat_buf)
+                    _pFeat_buf = None
+                    # --- end debug ---
+
+                elif sGeometry_type == 'MULTILINESTRING':
+                    for i in range(outside_flowline.GetGeometryCount()):
+                        outside_part_i = outside_flowline.GetGeometryRef(i)
+                        if outside_part_i is None or outside_part_i.IsEmpty():
+                            continue
+                        nOutside_count += 1
+                        sWkt = outside_part_i.ExportToWkt()
+                        point_start = outside_part_i.GetPoint(0)
+                        point_end   = outside_part_i.GetPoint(outside_part_i.GetPointCount() - 1)
+                        distance = calculate_distance_based_on_longitude_latitude(
+                            point_start[0], point_start[1], point_end[0], point_end[1])
+                        reference_latitude = (point_start[1] + point_end[1]) / 2.0
+                        sWkt_buffer_polygon = create_wkt_buffer_distance(
+                            sWkt, distance / 2.0, epsg=4326, reference_latitude=reference_latitude)
+                        pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
+                        aBuffer_geometries.append(pBuffer_geometry)
+
+                        # --- debug ---
+                        _pFeat_fl = ogr.Feature(pLayer_debug_fl.GetLayerDefn())
+                        _pFeat_fl.SetGeometry(outside_part_i.Clone())
+                        _pFeat_fl.SetField('flowline_file', sFlowline_basename)
+                        _pFeat_fl.SetField('segment_idx',   nOutside_count)
+                        _pFeat_fl.SetField('geom_type',     'MULTILINESTRING_part')
+                        _pFeat_fl.SetField('distance_m',    distance)
+                        pLayer_debug_fl.CreateFeature(_pFeat_fl)
+                        _pFeat_fl = None
+
+                        _pFeat_buf = ogr.Feature(pLayer_debug_buf.GetLayerDefn())
+                        _pFeat_buf.SetGeometry(pBuffer_geometry.Clone())
+                        _pFeat_buf.SetField('flowline_file', sFlowline_basename)
+                        _pFeat_buf.SetField('segment_idx',   nOutside_count)
+                        _pFeat_buf.SetField('distance_m',    distance)
+                        pLayer_debug_buf.CreateFeature(_pFeat_buf)
+                        _pFeat_buf = None
+                        # --- end debug ---
+
+                else:
+                    print(f'Warning: Unexpected geometry type for outside flowline: '
+                          f'{sGeometry_type}, skipping buffer creation')
+
+            elif not bIntersects_land:
+                # The flowline does not intersect any land polygon at all —
+                # the entire flowline is outside land and must be buffered.
+                outside_flowline = pGeometry_flowline.Clone()
+                outside_flowline.FlattenTo2D()
+                sGeometry_type = outside_flowline.GetGeometryName()
+
+                if sGeometry_type == 'LINESTRING':
+                    nOutside_count += 1
+                    sWkt = outside_flowline.ExportToWkt()
+                    point_start = outside_flowline.GetPoint(0)
+                    point_end   = outside_flowline.GetPoint(outside_flowline.GetPointCount() - 1)
+                    distance = calculate_distance_based_on_longitude_latitude(
+                        point_start[0], point_start[1], point_end[0], point_end[1])
+                    reference_latitude = (point_start[1] + point_end[1]) / 2.0
+                    sWkt_buffer_polygon = create_wkt_buffer_distance(
+                        sWkt, distance / 2.0, epsg=4326, reference_latitude=reference_latitude)
+                    pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
+                    aBuffer_geometries.append(pBuffer_geometry)
+
+                    # --- debug ---
+                    _pFeat_fl = ogr.Feature(pLayer_debug_fl.GetLayerDefn())
+                    _pFeat_fl.SetGeometry(outside_flowline.Clone())
+                    _pFeat_fl.SetField('flowline_file', sFlowline_basename)
+                    _pFeat_fl.SetField('segment_idx',   nOutside_count)
+                    _pFeat_fl.SetField('geom_type',     'LINESTRING_no_land')
+                    _pFeat_fl.SetField('distance_m',    distance)
+                    pLayer_debug_fl.CreateFeature(_pFeat_fl)
+                    _pFeat_fl = None
+
+                    _pFeat_buf = ogr.Feature(pLayer_debug_buf.GetLayerDefn())
+                    _pFeat_buf.SetGeometry(pBuffer_geometry.Clone())
+                    _pFeat_buf.SetField('flowline_file', sFlowline_basename)
+                    _pFeat_buf.SetField('segment_idx',   nOutside_count)
+                    _pFeat_buf.SetField('distance_m',    distance)
+                    pLayer_debug_buf.CreateFeature(_pFeat_buf)
+                    _pFeat_buf = None
+                    # --- end debug ---
+
+                elif sGeometry_type == 'MULTILINESTRING':
+                    for i in range(outside_flowline.GetGeometryCount()):
+                        outside_part_i = outside_flowline.GetGeometryRef(i)
+                        if outside_part_i is None or outside_part_i.IsEmpty():
+                            continue
+                        nOutside_count += 1
+                        sWkt = outside_part_i.ExportToWkt()
+                        point_start = outside_part_i.GetPoint(0)
+                        point_end   = outside_part_i.GetPoint(outside_part_i.GetPointCount() - 1)
+                        distance = calculate_distance_based_on_longitude_latitude(
+                            point_start[0], point_start[1], point_end[0], point_end[1])
+                        reference_latitude = (point_start[1] + point_end[1]) / 2.0
+                        sWkt_buffer_polygon = create_wkt_buffer_distance(
+                            sWkt, distance / 2.0, epsg=4326, reference_latitude=reference_latitude)
+                        pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
+                        aBuffer_geometries.append(pBuffer_geometry)
+
+                        # --- debug ---
+                        _pFeat_fl = ogr.Feature(pLayer_debug_fl.GetLayerDefn())
+                        _pFeat_fl.SetGeometry(outside_part_i.Clone())
+                        _pFeat_fl.SetField('flowline_file', sFlowline_basename)
+                        _pFeat_fl.SetField('segment_idx',   nOutside_count)
+                        _pFeat_fl.SetField('geom_type',     'MULTILINESTRING_no_land')
+                        _pFeat_fl.SetField('distance_m',    distance)
+                        pLayer_debug_fl.CreateFeature(_pFeat_fl)
+                        _pFeat_fl = None
+
+                        _pFeat_buf = ogr.Feature(pLayer_debug_buf.GetLayerDefn())
+                        _pFeat_buf.SetGeometry(pBuffer_geometry.Clone())
+                        _pFeat_buf.SetField('flowline_file', sFlowline_basename)
+                        _pFeat_buf.SetField('segment_idx',   nOutside_count)
+                        _pFeat_buf.SetField('distance_m',    distance)
+                        pLayer_debug_buf.CreateFeature(_pFeat_buf)
+                        _pFeat_buf = None
+                        # --- end debug ---
 
         logger.info(f'  Found {nOutside_count} flowline features (or parts) requiring buffers out of {nFlowline_features} total')
 
         # Clean up flowline dataset
         pDataset_flowline = None
+
+    # Flush and close debug datasets
+    pDataset_debug_fl  = None
+    pDataset_debug_buf = None
+    logger.info(f'Debug outside-flowline segments saved to: {sFilename_debug_flowlines}')
+    logger.info(f'Debug outside-flowline buffers  saved to: {sFilename_debug_buffers}')
 
     # Create the updated Natural Earth file
 
@@ -972,7 +1140,7 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
     sBase_name = os.path.splitext(os.path.basename(sFilename_vector_naturalearth))[0]
 
     sFilename_vector_naturalearth_tmp = os.path.join(os.path.dirname(sFilename_vector_naturalearth), sBase_name + '_tmp'+ sExtension)
-
+    sFilename_vector_naturalearth_tmp2 = os.path.join(os.path.dirname(sFilename_vector_naturalearth), sBase_name + '_tmp2'+ sExtension)
 
     sFormat = 'GeoJSON'  # Default format
 
@@ -984,6 +1152,9 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
     # Remove existing output file if it exists
     if os.path.exists(sFilename_vector_naturalearth_tmp):
         pDriver.DeleteDataSource(sFilename_vector_naturalearth_tmp)
+
+    if os.path.exists(sFilename_vector_naturalearth_tmp2):
+        pDriver.DeleteDataSource(sFilename_vector_naturalearth_tmp2)
 
     # Create output dataset
     pDataset_output = pDriver.CreateDataSource(sFilename_vector_naturalearth_tmp)
@@ -1031,7 +1202,9 @@ def fix_naturalearth_hydrosheds_incompatibility(aFilename_hydrosheds_flowline: l
     pDataset_output = None
     pDataset_naturalearth = None
 
-    merge_features(sFilename_vector_naturalearth_tmp, sFilename_vector_naturalearth_updated)
+    merge_features(sFilename_vector_naturalearth_tmp, sFilename_vector_naturalearth_tmp2)
+
+    remove_internal_polygon(sFilename_vector_naturalearth_tmp2, sFilename_vector_naturalearth_updated)
 
     logger.info(f'Successfully created updated Natural Earth file: {sFilename_vector_naturalearth_updated}')
     logger.info(f'Added {len(aBuffer_geometries)} buffer zones for rivers outside original land polygons')

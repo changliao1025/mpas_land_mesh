@@ -660,7 +660,11 @@ def add_field_to_vector_file(sFilename_in, aField, aValue):
 
 def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
     """
-    Merge all features in a vector file into a single feature
+    Merge all features in a vector file into a single unioned feature.
+
+    Uses a cascaded (divide-and-conquer) union strategy to avoid topological
+    holes and slivers that arise from iterative pairwise Union calls when
+    buffer polygons straddle existing land-polygon boundaries.
 
     Args:
         sFilename_in (str): Input vector file
@@ -687,18 +691,24 @@ def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
     pDataset_out = pDriver.CreateDataSource(sFilename_out)
     pLayer_out = pDataset_out.CreateLayer('merged', pSpatialRef, ogr.wkbMultiPolygon)
 
-    # Collect all geometries
+    # Collect all geometries, fixing validity to prevent topological holes
     aGeometry = []
     for pFeature in pLayer_in:
         pGeometry = pFeature.GetGeometryRef()
         if pGeometry is not None:
-            aGeometry.append(pGeometry.Clone())
+            pGeom_clone = pGeometry.Clone()
+            # Buffer by 0 is the standard OGR trick to fix self-intersections
+            # and invalid rings that cause holes after Union
+            if not pGeom_clone.IsValid():
+                pGeom_fixed = pGeom_clone.Buffer(0)
+                if pGeom_fixed is not None and not pGeom_fixed.IsEmpty():
+                    pGeom_clone = pGeom_fixed
+            aGeometry.append(pGeom_clone)
 
-    # Create union of all geometries
+    # Create union of all geometries using cascaded (divide-and-conquer) union
+    # to avoid holes/slivers from iterative pairwise Union calls
     if len(aGeometry) > 0:
-        pGeometry_merged = aGeometry[0]
-        for i in range(1, len(aGeometry)):
-            pGeometry_merged = pGeometry_merged.Union(aGeometry[i])
+        pGeometry_merged = _cascaded_union(aGeometry)
 
         # Create output feature
         pFeature_out = ogr.Feature(pLayer_out.GetLayerDefn())
@@ -708,6 +718,43 @@ def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
 
     pDataset_in = None
     pDataset_out = None
+
+
+def _cascaded_union(geometries):
+    """
+    Perform a cascaded (divide-and-conquer) union of a list of OGR geometries.
+
+    This avoids the topological holes and slivers that arise from a simple
+    left-to-right iterative Union when buffer polygons partially overlap
+    existing land polygons.  By repeatedly halving the list and merging
+    pairs, each intermediate result covers a spatially coherent region,
+    which keeps the union numerically stable.
+
+    Args:
+        geometries (list[ogr.Geometry]): Non-empty list of OGR geometries.
+
+    Returns:
+        ogr.Geometry: The union of all input geometries.
+    """
+    if len(geometries) == 1:
+        return geometries[0]
+    if len(geometries) == 2:
+        result = geometries[0].Union(geometries[1])
+        # Heal any residual self-intersections introduced by the union
+        if result is not None and not result.IsValid():
+            healed = result.Buffer(0)
+            if healed is not None and not healed.IsEmpty():
+                return healed
+        return result
+    mid = len(geometries) // 2
+    left = _cascaded_union(geometries[:mid])
+    right = _cascaded_union(geometries[mid:])
+    result = left.Union(right)
+    if result is not None and not result.IsValid():
+        healed = result.Buffer(0)
+        if healed is not None and not healed.IsEmpty():
+            return healed
+    return result
 
 
 def write_wkt_to_vector_file(wkt, sFilename_out, iEPSG_in=4326):
@@ -1038,6 +1085,160 @@ def remove_small_polygon(
         # Clean up input datasource
         pDataSource_in = None
 
+
+def remove_internal_polygon( sFilename_vector_in: str,
+    sFilename_vector_out: str, verbose: bool = True):
+    # Input validation
+    if not isinstance(sFilename_vector_in, str) or not sFilename_vector_in.strip():
+        raise ValueError("Input filename must be a non-empty string")
+
+    if not isinstance(sFilename_vector_out, str) or not sFilename_vector_out.strip():
+        raise ValueError("Output filename must be a non-empty string")
+
+    if not os.path.exists(sFilename_vector_in):
+        raise FileNotFoundError(f"Input file does not exist: {sFilename_vector_in}")
+
+    # Remove existing output file if it exists
+    if os.path.exists(sFilename_vector_out):
+        if verbose:
+            logging.info(f"Removing existing output file: {sFilename_vector_out}")
+        try:
+            os.remove(sFilename_vector_out)
+        except OSError as e:
+            raise RuntimeError(f"Could not remove existing output file: {e}")
+
+    # Determine formats and drivers
+    try:
+        sFormat_in = get_vector_format_from_filename(sFilename_vector_in)
+        sFormat_out = get_vector_format_from_filename(sFilename_vector_out)
+        pDriver_out = get_vector_driver_from_format(sFormat_out)
+    except Exception as e:
+        raise RuntimeError(f"Failed to determine vector format: {e}")
+
+    if pDriver_out is None:
+        available_formats = print_supported_vector_formats()
+        raise ValueError(
+            f"Output format '{sFormat_out}' is not supported. "
+            f"Available formats: {available_formats}"
+        )
+
+    if verbose:
+        logging.info(f"Input format: {sFormat_in}")
+        logging.info(f"Output format: {sFormat_out}")
+
+    # Set up spatial reference (WGS84 for geodesic calculations)
+    try:
+        pSrs = osr.SpatialReference()
+        pSrs.ImportFromEPSG(4326)
+    except Exception as e:
+        raise RuntimeError(f"Failed to create spatial reference: {e}")
+
+    # Open input datasource
+    try:
+        pDataSource_in = ogr.Open(sFilename_vector_in, 0)  # Read-only
+        if pDataSource_in is None:
+            raise RuntimeError(f"Could not open input file: {sFilename_vector_in}")
+    except Exception as e:
+        raise RuntimeError(f"GDAL error opening input file: {e}")
+
+    try:
+        pLayer_in = pDataSource_in.GetLayer()
+        if pLayer_in is None:
+            raise RuntimeError("Could not access input layer")
+
+        # Get feature count for progress tracking
+        nTotal_features = pLayer_in.GetFeatureCount()
+        if nTotal_features < 0:
+            logging.warning(
+                "Could not determine total feature count, progress reporting may be inaccurate"
+            )
+
+        if verbose:
+            logging.info(f"Processing {nTotal_features} features...")
+
+        # Create output datasource
+        try:
+            pDataSource_out = pDriver_out.CreateDataSource(sFilename_vector_out)
+            if pDataSource_out is None:
+                raise RuntimeError(
+                    f"Could not create output file: {sFilename_vector_out}"
+                )
+        except Exception as e:
+            raise RuntimeError(f"GDAL error creating output file: {e}")
+
+        try:
+            # Create output layer
+            pLayer_out = pDataSource_out.CreateLayer(
+                "filtered_polygons", pSrs, ogr.wkbPolygon
+            )
+            if pLayer_out is None:
+                raise RuntimeError("Could not create output layer")
+
+            # Copy fields from input layer to output layer
+            pLayer_defn_in = pLayer_in.GetLayerDefn()
+            for i in range(pLayer_defn_in.GetFieldCount()):
+                field_defn = pLayer_defn_in.GetFieldDefn(i)
+                pLayer_out.CreateField(field_defn)
+
+            # Process features
+            for i, pFeature_in in enumerate(pLayer_in):
+                pGeometry_in = pFeature_in.GetGeometryRef()
+                if pGeometry_in is None:
+                    logging.warning(f"Feature {i} has no geometry, skipping")
+                    continue
+
+                # Check if the polygon has holes (internal rings); if so, rebuild with outer ring only
+                print(f"Processing feature {i} with geometry type: {pGeometry_in.GetGeometryName()}")
+                sGeometryType = pGeometry_in.GetGeometryName()
+                pGeometry_in.GetGeometryType()
+                if sGeometryType == "POLYGON":
+                    if pGeometry_in.GetGeometryCount() > 1:
+                        # Rebuild a new polygon using only the outer ring
+                        pOuterRing = pGeometry_in.GetGeometryRef(0)
+                        pGeometry_out = ogr.Geometry(ogr.wkbPolygon)
+                        pGeometry_out.AddGeometry(pOuterRing.Clone())
+                    else:
+                        pGeometry_out = pGeometry_in.Clone()
+                else:
+                    if sGeometryType == "MULTIPOLYGON":
+                        # For MULTIPOLYGON, process each polygon separately
+                        pGeometry_out = ogr.Geometry(ogr.wkbMultiPolygon)
+                        for j in range(pGeometry_in.GetGeometryCount()):
+                            pPolygon = pGeometry_in.GetGeometryRef(j)
+                            if pPolygon.GetGeometryCount() > 1:
+                                # Rebuild polygon with only outer ring
+                                pOuterRing = pPolygon.GetGeometryRef(0)
+                                pNewPolygon = ogr.Geometry(ogr.wkbPolygon)
+                                pNewPolygon.AddGeometry(pOuterRing.Clone())
+                                pGeometry_out.AddGeometry(pNewPolygon)
+                            else:
+                                pGeometry_out.AddGeometry(pPolygon.Clone())
+                    else:
+                        print(sGeometryType)
+                        continue  # Skip non-polygon geometries
+
+                # Create a new feature for the output layer
+                pFeature_out = ogr.Feature(pLayer_out.GetLayerDefn())
+                pFeature_out.SetGeometry(pGeometry_out)
+
+                # Copy attributes
+                for j in range(pLayer_defn_in.GetFieldCount()):
+                    field_value = pFeature_in.GetField(j)
+                    pFeature_out.SetField(j, field_value)
+
+                # Add the feature to the output layer
+                if pLayer_out.CreateFeature(pFeature_out) != 0:
+                    raise RuntimeError(f"Failed to create feature {i} in output layer")
+
+                # Clean up
+                pFeature_out = None
+        finally:
+            # Flush and close output datasource
+            pDataSource_out = None
+
+    finally:
+        # Clean up input datasource
+        pDataSource_in = None
 
 def _process_single_polygon(
     pGeometry: ogr.Geometry,
