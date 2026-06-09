@@ -24,7 +24,6 @@ from mpas_land_mesh.utilities.vector import (
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster, create_raster_buffer_zone, fix_raster_antimeridian_issue
 from mpas_land_mesh.utilities.geometry import calculate_distance_based_on_longitude_latitude
 from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
-from pyearthbuffer.utility.create_gcs_buffer_zone import create_buffer_zone_polygon_file
 
 gdal.UseExceptions()
 
@@ -757,13 +756,6 @@ def create_land_ocean_mask_from_naturalearth(sWorkspace_coastline_output: str,
 
     sFilename_vector_coastline_wo_internal_ring = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_removed_internal.geojson')
     remove_internal_polygon(sFilename_vector_coastline, sFilename_vector_coastline_wo_internal_ring)
-
-    #special treatment, buffer will create issue for some sea areas, so must be used carefully
-    #if dResolution_coastline_buffer > 0:
-    #    sFilename_geojson_buffer = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_buffer.geojson')
-    #    create_buffer_zone_polygon_file(sFilename_vector_coastline, sFilename_geojson_buffer,
-    #                                      dBuffer_distance_in = dResolution_coastline_buffer )
-    #    sFilename_vector_coastline = sFilename_geojson_buffer
 
     sFilename_tif_wo_island = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island.tif')
     convert_vector_to_global_raster(sFilename_vector_coastline_wo_internal_ring,
