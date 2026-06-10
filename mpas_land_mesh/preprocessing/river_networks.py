@@ -519,7 +519,7 @@ def simplify_hydrorivers_networks(
         """
         try:
             # R-tree delete requires both the ID and the exact bounding box
-            index_reach.remove(item_id, bounding_box)
+            index_reach.delete(item_id, bounding_box)
             logger.debug(f"Successfully removed item {item_id} from R-tree")
             return True
         except Exception as e:
