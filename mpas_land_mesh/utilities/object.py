@@ -9,7 +9,12 @@ available, with a pure-Python fallback.
 
 import numpy as np
 import logging
-from rtree.index import Index as RTreeindex
+
+try:
+    from rtree.index import Index as RTreeindex
+except Exception:  # pragma: no cover - environment-dependent
+    RTreeindex = None
+
 from mpas_land_mesh.utilities.spatial_reference import reproject_coordinates
 
 # NOTE: mpas_land_mesh.classes imports (pyvertex, pyedge, pyflowline) are done

@@ -9,9 +9,22 @@ import sys
 sys.setrecursionlimit(100000)
 import logging
 import numpy as np
-from osgeo import ogr, osr, gdal
 
-from rtree.index import Index as RTreeindex
+try:
+    from osgeo import ogr, osr, gdal
+except Exception as exc:  # pragma: no cover - environment-dependent
+    ogr = None
+    osr = None
+    gdal = None
+    _GDAL_IMPORT_ERROR = exc
+else:
+    _GDAL_IMPORT_ERROR = None
+
+try:
+    from rtree.index import Index as RTreeindex
+except Exception:  # pragma: no cover - environment-dependent
+    RTreeindex = None
+
 from datetime import datetime
 
 from mpas_land_mesh.utilities.geometry  import (

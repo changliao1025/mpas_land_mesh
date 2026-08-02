@@ -7,8 +7,12 @@ using Well-Known Text (WKT) projection definitions.
 
 from typing import List, Tuple, Optional
 
-import osgeo
-from osgeo import osr
+try:
+    import osgeo
+    from osgeo import osr
+except Exception:  # pragma: no cover - environment-dependent
+    osgeo = None
+    osr = None
 
 
 def reproject_coordinates(

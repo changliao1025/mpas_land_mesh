@@ -1,6 +1,11 @@
 import os
 import json
-from osgeo import ogr, osr
+
+try:
+    from osgeo import ogr, osr
+except Exception:  # pragma: no cover - environment-dependent
+    ogr = None
+    osr = None
 
 from mpas_land_mesh.classes.edge import pyedge
 from mpas_land_mesh.classes.link import pycelllink

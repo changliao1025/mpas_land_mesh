@@ -16,7 +16,10 @@ import time
 # Set up logger
 logger = logging.getLogger(__name__)
 
-from rtree.index import Index as RTreeindex
+try:
+    from rtree.index import Index as RTreeindex
+except Exception:  # pragma: no cover - environment-dependent
+    RTreeindex = None
 
 from mpas_land_mesh.classes.flowline import pyflowline
 from mpas_land_mesh.classes.vertex import pyvertex

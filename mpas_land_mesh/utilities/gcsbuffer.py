@@ -4,7 +4,11 @@ Simple geometry buffer utilities
 Provides simplified buffer operations without geodesic complexity
 """
 
-from osgeo import ogr, osr
+try:
+    from osgeo import ogr, osr
+except Exception:  # pragma: no cover - environment-dependent
+    ogr = None
+    osr = None
 
 from mpas_land_mesh.utilities.constants import earth_radius
 

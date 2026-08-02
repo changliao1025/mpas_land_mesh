@@ -6,8 +6,22 @@ Simplified implementations for coastline operations
 
 import os
 import logging
-from osgeo import gdal, ogr, osr
-from rtree.index import Index as RTreeindex
+
+try:
+    from osgeo import gdal, ogr, osr
+except Exception as exc:  # pragma: no cover - environment-dependent
+    gdal = None
+    ogr = None
+    osr = None
+    _GDAL_IMPORT_ERROR = exc
+else:
+    _GDAL_IMPORT_ERROR = None
+
+try:
+    from rtree.index import Index as RTreeindex
+except Exception:  # pragma: no cover - environment-dependent
+    RTreeindex = None
+
 import logging
 from pathlib import Path
 from typing import Optional, Literal
@@ -25,7 +39,8 @@ from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster, cre
 from mpas_land_mesh.utilities.geometry import calculate_distance_based_on_longitude_latitude
 from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
 
-gdal.UseExceptions()
+if gdal is not None:
+    gdal.UseExceptions()
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)

@@ -10,7 +10,11 @@ import json
 from json import JSONEncoder
 import numpy as np
 from typing import List, Tuple, Optional, Dict, Any
-from osgeo import ogr
+
+try:
+    from osgeo import ogr
+except Exception:  # pragma: no cover - environment-dependent
+    ogr = None
 
 # Import local classes
 from mpas_land_mesh.classes.vertex import pyvertex

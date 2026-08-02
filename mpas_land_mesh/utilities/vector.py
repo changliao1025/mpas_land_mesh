@@ -10,8 +10,18 @@ import logging
 import time
 from typing import Union, Optional, Tuple
 import numpy as np
-import osgeo
-from osgeo import ogr, osr, gdal
+
+try:
+    from osgeo import ogr, osr, gdal
+except Exception as exc:  # pragma: no cover - environment-dependent
+    ogr = None
+    osr = None
+    gdal = None
+    _GDAL_IMPORT_ERROR = exc
+else:
+    _GDAL_IMPORT_ERROR = None
+
+    gdal.UseExceptions()
 
 from functools import lru_cache
 
@@ -21,8 +31,6 @@ from mpas_land_mesh.utilities.geometry import (
 )
 from mpas_land_mesh.utilities.constants import IDL_threshold
 
-
-gdal.UseExceptions()
 
 SUPPORTED_VECTOR_FORMATS = {
     ".geojson": "GeoJSON",
@@ -45,16 +53,19 @@ SUPPORTED_VECTOR_FORMATS = {
 
 # Geometry type mapping: normalises multi/2.5D types to simple 2D equivalents.
 # Used internally by convert_geojson_to_parquet.
-_GEOMETRY_TYPE_MAPPING = {
-    ogr.wkbPoint: ogr.wkbPoint,
-    ogr.wkbLineString: ogr.wkbLineString,
-    ogr.wkbLineString25D: ogr.wkbLineString,
-    ogr.wkbPolygon: ogr.wkbPolygon,
-    ogr.wkbMultiPoint: ogr.wkbPoint,
-    ogr.wkbMultiLineString: ogr.wkbLineString,
-    ogr.wkbMultiLineString25D: ogr.wkbLineString,
-    ogr.wkbMultiPolygon: ogr.wkbPolygon,
-}
+if ogr is not None:
+    _GEOMETRY_TYPE_MAPPING = {
+        ogr.wkbPoint: ogr.wkbPoint,
+        ogr.wkbLineString: ogr.wkbLineString,
+        ogr.wkbLineString25D: ogr.wkbLineString,
+        ogr.wkbPolygon: ogr.wkbPolygon,
+        ogr.wkbMultiPoint: ogr.wkbPoint,
+        ogr.wkbMultiLineString: ogr.wkbLineString,
+        ogr.wkbMultiLineString25D: ogr.wkbLineString,
+        ogr.wkbMultiPolygon: ogr.wkbPolygon,
+    }
+else:
+    _GEOMETRY_TYPE_MAPPING = {}
 
 
 __all__ = [
@@ -83,6 +94,9 @@ def get_available_vector_formats() -> dict[str, str]:
     """
     available_formats = {}
 
+    if ogr is None or osr is None or gdal is None:
+        return {}
+
     for ext, format_name in SUPPORTED_VECTOR_FORMATS.items():
         # Special handling for Parquet/GeoParquet
         if ext in (".parquet", ".geoparquet"):
@@ -108,6 +122,11 @@ def gdal_vector_format_support() -> dict[str, str]:
     dict[str, str]: A dictionary of available vector formats mapping file extensions to OGR driver names.
     """
     return get_available_vector_formats()
+
+
+def get_gdal_import_error() -> Optional[Exception]:
+    """Return the original GDAL import error when the native extension is unavailable."""
+    return _GDAL_IMPORT_ERROR
 
 
 def print_supported_vector_formats() -> None:
@@ -1241,15 +1260,15 @@ def remove_internal_polygon( sFilename_vector_in: str,
         pDataSource_in = None
 
 def _process_single_polygon(
-    pGeometry: ogr.Geometry,
+    pGeometry: 'ogr.Geometry',
     dThreshold: float,
     iFlag_algorithm: int,
-    pSrs: osr.SpatialReference,
-    pLayerDefn_out: ogr.FeatureDefn,
-    pFeature_in: ogr.Feature,
-    pLayerDefn_in: ogr.FeatureDefn,
+    pSrs: 'osr.SpatialReference',
+    pLayerDefn_out: 'ogr.FeatureDefn',
+    pFeature_in: 'ogr.Feature',
+    pLayerDefn_in: 'ogr.FeatureDefn',
     lID: int,
-    pLayer_out: ogr.Layer,
+    pLayer_out: 'ogr.Layer',
 ) -> bool:
     """
     Process a single POLYGON geometry.
@@ -1346,15 +1365,15 @@ def _process_single_polygon(
 
 
 def _process_multipolygon(
-    pGeometry: ogr.Geometry,
+    pGeometry: 'ogr.Geometry',
     dThreshold: float,
     iFlag_algorithm: int,
-    pSrs: osr.SpatialReference,
-    pLayerDefn_out: ogr.FeatureDefn,
-    pFeature_in: ogr.Feature,
-    pLayerDefn_in: ogr.FeatureDefn,
+    pSrs: 'osr.SpatialReference',
+    pLayerDefn_out: 'ogr.FeatureDefn',
+    pFeature_in: 'ogr.Feature',
+    pLayerDefn_in: 'ogr.FeatureDefn',
     lID_start: int,
-    pLayer_out: ogr.Layer,
+    pLayer_out: 'ogr.Layer',
 ) -> int:
     """
     Process a MULTIPOLYGON geometry, creating separate features for each polygon part.

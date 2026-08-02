@@ -9,7 +9,11 @@ import json
 from json import JSONEncoder
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
-from osgeo import ogr
+
+try:
+    from osgeo import ogr
+except Exception:  # pragma: no cover - environment-dependent
+    ogr = None
 
 # Import local distance calculation function
 from mpas_land_mesh.utilities.geometry import (

@@ -6,7 +6,16 @@ Minimal implementations for raster operations
 
 import os
 import numpy as np
-from osgeo import gdal, ogr, osr
+
+try:
+    from osgeo import gdal, ogr, osr
+except Exception as exc:  # pragma: no cover - environment-dependent
+    gdal = None
+    ogr = None
+    osr = None
+    _GDAL_IMPORT_ERROR = exc
+else:
+    _GDAL_IMPORT_ERROR = None
 
 
 def convert_vector_to_global_raster(sFilename_vector_in, sFilename_raster_out,

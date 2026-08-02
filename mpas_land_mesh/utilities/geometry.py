@@ -2,8 +2,15 @@
 import math
 from typing import Union, Tuple, List, Optional
 import numpy as np
-from osgeo import osr, gdal, ogr
-#import NDArray
+
+try:
+    from osgeo import osr, gdal, ogr
+except Exception:  # pragma: no cover - environment-dependent
+    osr = None
+    gdal = None
+    ogr = None
+
+# import NDArray
 from numpy.typing import NDArray
 
 from mpas_land_mesh.utilities.constants import earth_radius, IDL_TOLERANCE, IDL_OFFSET
@@ -2104,7 +2111,7 @@ def check_counter_clockwise(coords: np.ndarray) -> bool:
     return signed_area > 0
 
 def get_geometry_coordinates(
-    geometry: ogr.Geometry,
+    geometry: 'ogr.Geometry',
     enforce_ccw: bool = False,
 ) -> Union[np.ndarray, List[np.ndarray]]:
     """Extract coordinates from an OGR geometry object.
@@ -2192,7 +2199,7 @@ def get_geometry_coordinates(
 
 
 def get_polygon_exterior_coords(
-    polygon_geometry: ogr.Geometry, enforce_ccw: bool = False
+    polygon_geometry: 'ogr.Geometry', enforce_ccw: bool = False
 ) -> np.ndarray:
     """Extract exterior ring coordinates from a polygon.
 
@@ -2271,7 +2278,7 @@ def get_polygon_exterior_coords(
 
 
 def get_multipolygon_exterior_coords(
-    multipolygon_geometry: ogr.Geometry,
+    multipolygon_geometry: 'ogr.Geometry',
     enforce_ccw: bool = False,
 ) -> List[np.ndarray]:
     """Extract exterior ring coordinates from all parts of a multipolygon.
@@ -2381,7 +2388,7 @@ def get_multipolygon_exterior_coords(
     return exterior_coords_list
 
 
-def get_linestring_coords(linestring_geometry: ogr.Geometry) -> np.ndarray:
+def get_linestring_coords(linestring_geometry: 'ogr.Geometry') -> np.ndarray:
     """Extract coordinates from a linestring geometry.
 
     Parameters
@@ -2431,7 +2438,7 @@ def get_linestring_coords(linestring_geometry: ogr.Geometry) -> np.ndarray:
     return np.array(coords)
 
 
-def get_point_coords(point_geometry: ogr.Geometry) -> np.ndarray:
+def get_point_coords(point_geometry: 'ogr.Geometry') -> np.ndarray:
     """Extract coordinates from a point geometry.
 
     Parameters
@@ -2476,7 +2483,7 @@ def get_point_coords(point_geometry: ogr.Geometry) -> np.ndarray:
     return np.array([(point[0], point[1])])
 
 
-def get_linearring_coords(linearring_geometry: ogr.Geometry) -> np.ndarray:
+def get_linearring_coords(linearring_geometry: 'ogr.Geometry') -> np.ndarray:
     """Extract coordinates from a linear ring geometry.
 
     Parameters
