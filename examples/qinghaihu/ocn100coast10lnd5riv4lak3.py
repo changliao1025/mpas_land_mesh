@@ -4,7 +4,7 @@
 #however, all the output will be saved in the same output directory for easy access
 
 #you can change this to your preferred output directory
-import os
+import os, platform
 import glob
 import logging
 from datetime import datetime
@@ -29,6 +29,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 sDate_today = datetime.now().strftime('%Y%m%d')
+
+
+platform = platform.system()
 
 #things that may need to be changed for different runs
 sDate_today = '20260801'  #use a fixed date for easy repeatability
@@ -57,21 +60,6 @@ iFlag_process_coastline = 1
 #number of largest outlet to be processed
 nOutlet_largest = 10
 
-#thing may not need to be changed
-sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
-sWorkspace_output = '/data2/share/liaochang/04model/jigsaw/global'
-
-
-#define global output directory
-sWorkspace_river_network_output = '/data2/share/liaochang/04model/jigsaw/global/river_network'
-if os.path.exists(sWorkspace_river_network_output) is False:
-    os.makedirs(sWorkspace_river_network_output)
-
-
-sWorkspace_coastline_output = '/data2/share/liaochang/04model/jigsaw/global/coastline'
-if os.path.exists(sWorkspace_coastline_output) is False:
-    os.makedirs(sWorkspace_coastline_output)
-
 #for jigsaw resolution control
 dResolution_x_in = 30.0/3600 * dResolution_coastline
 dResolution_y_in = dResolution_x_in
@@ -89,8 +77,35 @@ sDrainage_area_threshold = "{:.2E}".format(dDrainage_area_threshold) # m2
 sCoastline_buffer = "{:.1E}".format(dResolution_coastline_buffer  ) # to m
 sThreshold_area_island = "{:.1E}".format(dThreshold_area_island ) # to m2
 
+#thing may not need to be changed
+if platform == '':
+    sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
+    sWorkspace_output = '/data2/share/liaochang/04model/jigsaw/global'
+    #define global output directory
+    sWorkspace_river_network_output = '/data2/share/liaochang/04model/jigsaw/global/river_network'   
+    sWorkspace_coastline_output = '/data2/share/liaochang/04model/jigsaw/global/coastline'    
+    sWorkspace_data = '/public/home/liaochang/data/hexwatershed/qinghaihu/'
+    sFilename_flowline_hydrosheds_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydroriver/asian/HydroRIVERS_v10_as_shp/HydroRIVERS_v10_as.shp'
+    sFilename_flowline_hydroshed_tmp = 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold + '.geojson'
+    sFilename_geojson_geometery_feature = '/public/home/liaochang/data/hexwatershed/global/vector/region.geojson'
+    sWorkspace_watershed_boundary_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydrobasin'
+else:
+    if platform == 'Windows':
+        sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
+        sWorkspace_output = 'D:\\scratch\\04model\\jigsaw\\global'
+        sWorkspace_river_network_output = 'D:\\scratch\\04model\\jigsaw\\global\\river_network'   
+        sWorkspace_coastline_output = 'D:\\scratch\\04model\\jigsaw\\global\\coastline'   
+        sWorkspace_data = 'D:\\data\\modeldata\\hexwatershed\\global'
 
-sWorkspace_data = '/public/home/liaochang/data/hexwatershed/qinghaihu/'
+        sFilename_flowline_hydroshed_tmp = 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold + '.geojson'
+
+        sFilename_geojson_geometery_feature = 'D:\\data\\modeldata\\hexwatershed\\global\\vector\\region.geojson'
+        sWorkspace_watershed_boundary_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydrobasin'
+
+if os.path.exists(sWorkspace_river_network_output) is False:
+    os.makedirs(sWorkspace_river_network_output)    
+if os.path.exists(sWorkspace_coastline_output) is False:
+    os.makedirs(sWorkspace_coastline_output)
 
 #add the threshol into the output folder
 sWorkspace_river_network_output = os.path.join(sWorkspace_river_network_output,  sDistance_tolerance + '_' + sDrainage_area_threshold)
@@ -105,14 +120,10 @@ if os.path.exists(sWorkspace_coastline_output) is False:
 #Step 1
 #prepare the river network and coastline line dataset
 
-sFilename_flowline_hydrosheds_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydroriver/asian/HydroRIVERS_v10_as_shp/HydroRIVERS_v10_as.shp'
-sFilename_flowline_hydroshed_tmp = 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold + '.geojson'
 sFilename_flowline_hydrosheds_out = os.path.join(sWorkspace_river_network_output, sFilename_flowline_hydroshed_tmp)
-sFilename_geojson_geometery_feature = '/public/home/liaochang/data/hexwatershed/global/vector/region.geojson'
-sWorkspace_watershed_boundary_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydrobasin'
+
 #step 1: record attribute from the MPAS tools
 aField, aValue = get_field_and_value(sFilename_geojson_geometery_feature)
-
 
 sFilename_river_network_raster = os.path.join(sWorkspace_river_network_output, 'river_network_raster.tif')
 
@@ -158,6 +169,8 @@ if iFlag_process_coastline == 1:
 else:
     #reuse
     pass
+
+exit()
 
 #Step 2 - 4
 #run the hexwatershed model, this step include three steps merged together.
