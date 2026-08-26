@@ -46,8 +46,6 @@ class jigsawcase:
         else:
             iCase_index = 1
 
-
-
         sCase_index = "{:03d}".format(iCase_index)
         self.iCase_index = iCase_index
 
