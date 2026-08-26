@@ -57,6 +57,8 @@ dDrainage_area_threshold = dResolution_land * dResolution_land * DRAINAGE_AREA_M
 iFlag_simplify_hydrosheds_river_network = 0
 iFlag_process_coastline = 1
 
+iFlag_endorheic_lake = 1
+
 #number of largest outlet to be processed
 nOutlet_largest = 10
 
@@ -78,7 +80,7 @@ sCoastline_buffer = "{:.1E}".format(dResolution_coastline_buffer  ) # to m
 sThreshold_area_island = "{:.1E}".format(dThreshold_area_island ) # to m2
 
 #thing may not need to be changed
-if platform == '':
+if platform == 'Linux':
     sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
     sWorkspace_output = '/data2/share/liaochang/04model/jigsaw/global'
     #define global output directory
@@ -154,18 +156,22 @@ if iFlag_process_coastline == 1:
                                                                              dResolution_coastline_buffer,
                                                                              iRaster_buffer_pixel = 2)
 
-    ##we need to fix the incompatibilty between hydrosheds and naturalearth
-    aFilename_flowline = list()
-    for i in range(1, nOutlet_largest+1):
-        sBasin_id = '{:04d}'.format(i)
-        sFilename_flowline_simplified_basin = os.path.join(sWorkspace_river_network_output, 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold +'_'+ sBasin_id + '.geojson')
-        aFilename_flowline.append(sFilename_flowline_simplified_basin)
-
-    sFilename_vector_coastline_updated = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_fixed.geojson')
-    fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_updated )
-    #should be merged into one single function
-    merge_features(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged, iFlag_force= True)
-    add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
+    if iFlag_endorheic_lake == 1:
+        #do we need to consider compatibility issue?
+        pass
+    else:
+        ##we need to fix the incompatibilty between hydrosheds and naturalearth
+        aFilename_flowline = list()
+        for i in range(1, nOutlet_largest+1):
+            sBasin_id = '{:04d}'.format(i)
+            sFilename_flowline_simplified_basin = os.path.join(sWorkspace_river_network_output, 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold +'_'+ sBasin_id + '.geojson')
+            aFilename_flowline.append(sFilename_flowline_simplified_basin)
+    
+        sFilename_vector_coastline_updated = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_fixed.geojson')
+        fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_updated )
+        #should be merged into one single function
+        merge_features(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged, iFlag_force= True)
+        add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
 else:
     #reuse
     pass
