@@ -194,7 +194,7 @@ class jigsawcase:
 
         return
 
-    def _jigsaw_create_hpc_job(self, sSlurm_in=None, hours_in=10):
+    def _jigsaw_create_hpc_job(self, sSlurm_in=None, hours_in=10, aCommand_list=None):
         """Create a HPC job for this JIGSAW simulation.
 
         Generates two files in self.sWorkspace_output:
@@ -208,6 +208,7 @@ class jigsawcase:
             hours_in  (int, optional): Wall-clock time limit in hours. Defaults to 10.
         """
         os.chdir(self.sWorkspace_output)
+        home_dir = Path.home()
         sConda_env_path, sConda_env_name, env_type = get_python_environment()
 
         # ------------------------------------------------------------------
@@ -218,13 +219,12 @@ class jigsawcase:
         )
         ofs_jigsaw = open(sFilename_jigsaw, "w")
 
+        python_exe_path = home_dir / ".conda" / "envs" / sConda_env_name / "bin" / "python3"
+
         sLine = (
-            "#!/qfs/people/liao313/.conda/envs/"
-            + sConda_env_name
-            + "/bin/"
-            + "python3"
-            + "\n"
-        )
+            f"#!{python_exe_path}\n"
+            )
+        
         ofs_jigsaw.write(sLine)
         sLine = "import os" + "\n"
         ofs_jigsaw.write(sLine)
@@ -298,8 +298,8 @@ class jigsawcase:
         ofs = open(sFilename_job, "w")
         sLine = "#!/bin/bash\n"
         ofs.write(sLine)
-        sLine = "#SBATCH -A E3SM\n"
-        ofs.write(sLine)
+        #sLine = "#SBATCH -A E3SM\n"
+        #ofs.write(sLine)
         sLine = "#SBATCH --job-name=" + self.sCase + "\n"
         ofs.write(sLine)
         sHour = "{:02d}".format(hours_in)
@@ -321,12 +321,15 @@ class jigsawcase:
         ofs.write(sLine)
         sLine = "module purge\n"
         ofs.write(sLine)
-        sLine = "module load gcc/8.1.0" + "\n"
-        ofs.write(sLine)
-        sLine = "module load python/miniconda2024May29 " + "\n"
-        ofs.write(sLine)
-        sLine = "source /share/apps/python/miniconda2024May29/etc/profile.d/conda.sh" + "\n"
-        ofs.write(sLine)
+        if aCommand_list is not None:
+            nCommand = len(aCommand_list)
+            for sCommand in aCommand_list:
+                sLine = sCommand + "\n"
+                ofs.write(sLine)
+        #sLine = "module load python/miniconda2024May29 " + "\n"
+        #ofs.write(sLine)
+        #sLine = "source /share/apps/python/miniconda2024May29/etc/profile.d/conda.sh" + "\n"
+        #ofs.write(sLine)
         sLine = "conda activate " + sConda_env_name + "\n"
         ofs.write(sLine)
         sLine = "cd $SLURM_SUBMIT_DIR\n"

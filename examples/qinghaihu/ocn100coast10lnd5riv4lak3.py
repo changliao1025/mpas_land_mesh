@@ -37,15 +37,17 @@ platform = platform.system()
 sDate_today = '20260801'  #use a fixed date for easy repeatability
 sMesh_type = 'mpas'  #
 #index for different runs
-iCase_index = 1
+iCase_index = 3
 sModel = 'jigsaw'
 
 #resolution settings
 #for rivers and watershed
 dResolution_ocean = 100
-dResolution_land = 100  #unit in km
-dResolution_river_network = 10
+dResolution_land = 12.5  #unit in km
+dResolution_river_network = 5
 dResolution_coastline = 10  #unit in km
+dResolution_lake_boundary = 3
+dResolution_watershed_boundary =3
 
 #for coastline
 dThreshold_area_island = dResolution_ocean * dResolution_ocean * ISLAND_AREA_MULTIPLIER * KM2_TO_M2  #unit m2, this one may need to be adjusted based on the resolution
@@ -55,7 +57,7 @@ dDrainage_area_threshold = dResolution_land * dResolution_land * DRAINAGE_AREA_M
 
 #setup flags for debugging
 iFlag_simplify_hydrosheds_river_network = 0
-iFlag_process_coastline = 1
+iFlag_process_coastline = 0
 
 iFlag_endorheic_lake = 1
 
@@ -82,9 +84,9 @@ sThreshold_area_island = "{:.1E}".format(dThreshold_area_island ) # to m2
 #thing may not need to be changed
 if platform == 'Linux':
     sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
-    sWorkspace_output = '/data2/share/liaochang/04model/jigsaw/global'
+    sWorkspace_output = '/data2/share/liaochang/04model/jigsaw/qinghaihu'
     #define global output directory
-    sWorkspace_river_network_output = '/data2/share/liaochang/04model/jigsaw/global/river_network'   
+    sWorkspace_river_network_output = '/data2/share/liaochang/04model/jigsaw/qinghaihu/river_network'   
     sWorkspace_coastline_output = '/data2/share/liaochang/04model/jigsaw/global/coastline'    
     sWorkspace_data = '/public/home/liaochang/data/hexwatershed/qinghaihu/'
     sFilename_flowline_hydrosheds_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydroriver/asian/HydroRIVERS_v10_as_shp/HydroRIVERS_v10_as.shp'
@@ -94,13 +96,11 @@ if platform == 'Linux':
 else:
     if platform == 'Windows':
         sWorkspace_input = '/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input'
-        sWorkspace_output = 'D:\\scratch\\04model\\jigsaw\\global'
-        sWorkspace_river_network_output = 'D:\\scratch\\04model\\jigsaw\\global\\river_network'   
+        sWorkspace_output = 'D:\\scratch\\04model\\jigsaw\\qinghaihu'
+        sWorkspace_river_network_output = 'D:\\scratch\\04model\\jigsaw\\qinghaihu\\river_network'   
         sWorkspace_coastline_output = 'D:\\scratch\\04model\\jigsaw\\global\\coastline'   
-        sWorkspace_data = 'D:\\data\\modeldata\\hexwatershed\\global'
-
+        sWorkspace_data = 'D:\\data\\modeldata\\hexwatershed\\qinghaihu'
         sFilename_flowline_hydroshed_tmp = 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold + '.geojson'
-
         sFilename_geojson_geometery_feature = 'D:\\data\\modeldata\\hexwatershed\\global\\vector\\region.geojson'
         sWorkspace_watershed_boundary_in = '/data2/share/liaochang/data/raw/hydrology/hydrosheds/hydrobasin'
 
@@ -129,8 +129,11 @@ aField, aValue = get_field_and_value(sFilename_geojson_geometery_feature)
 
 sFilename_river_network_raster = os.path.join(sWorkspace_river_network_output, 'river_network_raster.tif')
 
+#new
 sFilename_river_network_raster = os.path.join(sWorkspace_data, 'raster' ,'river_networks.tif')
 sFilename_watershed_boudnary_raster = os.path.join(sWorkspace_data, 'raster' ,'basin_boundary_mask.tif')
+
+sFilename_lake_boudnary_vector = os.path.join(sWorkspace_data, 'vector' ,'lake_boundary_hydrobasins_qinghaihu.geojson')
 sFilename_lake_boudnary_raster = os.path.join(sWorkspace_data, 'raster' ,'lake_boundary_mask.tif')
 
 if iFlag_simplify_hydrosheds_river_network == 1:
@@ -143,6 +146,7 @@ if iFlag_simplify_hydrosheds_river_network == 1:
                                          dResolution_x_in, dResolution_y_in )
 else:
     #reuse the existing simplified river network for debug purpose, you can also change this to the original hydrosheds river network for testing
+    sFilename_flowline_hydrosheds_out = '/public/home/liaochang/data/hexwatershed/qinghaihu/vector/flowline_hydroshed_simplified_clipped_clean.geojson'
     pass
 
 
@@ -174,9 +178,10 @@ if iFlag_process_coastline == 1:
         add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
 else:
     #reuse
+    sFilename_tif_wo_island = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_buffered_fixed.tif')
     pass
 
-exit()
+
 
 #Step 2 - 4
 #run the hexwatershed model, this step include three steps merged together.
@@ -201,25 +206,36 @@ if iFlag_debug == 1:
     #update the jigsaw configuration file below
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom", "true") # enable geometry control
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_river_network", "true") #set the resolution
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_lake_boundary", "true") #s
  
 
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac", "true") #enable resolution control
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_ocean", "true")
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_river_network", "true")
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_lake_boundary", "true")
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_watershed_boundary", "true")
+
     #change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_RRS18to6_ocean", "true")
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_land", "true")
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_coastline", "true") #set the resolution for coastline line
+
     change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_ocean", dResolution_ocean) #set the resolution for ocean
     change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_coastline", dResolution_coastline) #set the resolution for coastline line
     change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_land", dResolution_land) #set the resolution for land
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_river_network", dResolution_river_network) #set the resolution for river network
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_river_network", dResolution_river_network) #set the resolution for river netwokr
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_lake_boundary", dResolution_lake_boundary) #set the resolution for river network    
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_watershed_boundary", dResolution_watershed_boundary) #set the resolution for river network
+
+
     change_json_key_value(sFilename_jigsaw_configuration_copy, "ncolumn_space", ncolumn) #set the resolution for x direction
     change_json_key_value(sFilename_jigsaw_configuration_copy, "nrow_space", nrow) #set the resolution for y direction
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_dam_vector", sFilename_dam) #set the dam file
+    #change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_dam_vector", sFilename_dam) #set the dam file
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_vector", sFilename_flowline_hydrosheds_out) #set the resolution for x direction
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_raster", sFilename_river_network_raster) #set the small island removal threshold
 
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_watershed_boundary_raster", sFilename_watershed_boudnary_raster) #set the small island removal threshold
+
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_lake_boundary_vector", sFilename_lake_boudnary_vector) 
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_lake_boundary_raster", sFilename_lake_boudnary_raster) #set the small island removal threshold
    
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_coastline_raster", sFilename_tif_wo_island) #set the resolution for y direction
@@ -229,7 +245,10 @@ if iFlag_debug == 1:
                     iCase_index_in=iCase_index,
                     sDate_in= sDate_today)
 
-    oJigsaw._jigsaw_create_hpc_job(sSlurm_in = 'slurm', hours_in = 5 )
+    aCommand = list()
+    aCommand.append('module load apps/miniconda3/2023.10')
+    aCommand.append('source /public/software/apps/miniconda3/2023.10/etc/profile.d/conda.sh')
+    oJigsaw._jigsaw_create_hpc_job(sSlurm_in = 'cpu_single', hours_in = 3, aCommand_list= aCommand )
     #now you should manually submit the job
 
 else:
