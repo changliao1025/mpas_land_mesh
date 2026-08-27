@@ -63,25 +63,28 @@ def convert_gcs_attributes_to_cell(
         aVertexID_dummy = aVertexIndexOnEdge_in[j, :]
 
         # Start vertex
-        dummy_index = np.where(aVertexID_in == aVertexID_dummy[0])
+        dummy_index = np.where(aVertexID_in == int(aVertexID_dummy[0]))
         if len(dummy_index[0]) == 0:
             print("Vertex ID not found for edge start")
             return None
+        # get first matching index (integer scalar)
+        idx = dummy_index[0][0]
         pVertex1_dict = {
-            "dLongitude_degree": float(aCoordinates_gcs_in[dummy_index, 0]),
-            "dLatitude_degree": float(aCoordinates_gcs_in[dummy_index, 1]),
-        }
+            "dLongitude_degree": float(aCoordinates_gcs_in[idx, 0]),
+            "dLatitude_degree": float(aCoordinates_gcs_in[idx, 1]),
+            }
         pVertex_start = pyvertex(pVertex1_dict)
         pVertex_start.lVertexID = int(aVertexID_dummy[0])
 
         # End vertex
-        dummy_index = np.where(aVertexID_in == aVertexID_dummy[1])
+        dummy_index = np.where(aVertexID_in == int(aVertexID_dummy[1]))
         if len(dummy_index[0]) == 0:
             print("Vertex ID not found for edge end")
             return None
+        idx = dummy_index[0][0]
         pVertex2_dict = {
-            "dLongitude_degree": float(aCoordinates_gcs_in[dummy_index, 0]),
-            "dLatitude_degree": float(aCoordinates_gcs_in[dummy_index, 1]),
+            "dLongitude_degree": float(aCoordinates_gcs_in[idx, 0]),
+            "dLatitude_degree": float(aCoordinates_gcs_in[idx, 1]),
         }
         pVertex_end = pyvertex(pVertex2_dict)
         pVertex_end.lVertexID = int(aVertexID_dummy[1])
