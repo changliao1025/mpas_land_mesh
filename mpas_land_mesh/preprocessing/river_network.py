@@ -108,7 +108,7 @@ def precompute_flowline_geometries_by_segment(aFlowlines: list, dDistance_tolera
     return bounds_cache #, buffer_cache
 
 
-def simplify_hydrorivers_networks(
+def simplify_hydrorivers_network(
     sFilename_flowline_hydroshed_in: str,
     sFilename_flowline_hydroshed_out: str,
     dDistance_tolerance_in: float,
