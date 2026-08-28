@@ -16,8 +16,11 @@ from mpas_land_mesh.utilities.vector import get_field_and_value, merge_features,
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster
 from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER, DRAINAGE_AREA_MULTIPLIER
 
-from mpas_land_mesh.preprocessing.river_networks import simplify_hydrorivers_networks
-from mpas_land_mesh.preprocessing.coastlines import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
+#from mpas_land_mesh.preprocessing.river_network import simplify_hydrorivers_network
+#from mpas_land_mesh.preprocessing.coastline import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
+
+from hexwatershed_utility.preprocess.features.rivers import simplify_hydrorivers_network
+from hexwatershed_utility.preprocess.features.coastline.simplify_hydrorivers_network import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
 
 from mpas_land_mesh.utilities.config_manager import create_jigsaw_template_configuration_file, read_jigsaw_configuration_file
 
@@ -137,7 +140,7 @@ sFilename_lake_boudnary_vector = os.path.join(sWorkspace_data, 'vector' ,'lake_b
 sFilename_lake_boudnary_raster = os.path.join(sWorkspace_data, 'raster' ,'lake_boundary_mask.tif')
 
 if iFlag_simplify_hydrosheds_river_network == 1:
-    simplify_hydrorivers_networks(sFilename_flowline_hydrosheds_in,
+    simplify_hydrorivers_network(sFilename_flowline_hydrosheds_in,
                        sFilename_flowline_hydrosheds_out,
                        dDistance_tolerance,
                         dDrainage_area_threshold,
