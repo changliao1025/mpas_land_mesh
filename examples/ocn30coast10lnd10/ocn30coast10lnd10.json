@@ -1,0 +1,56 @@
+{
+  "workflow": {
+    "date": "20260601",
+    "mesh_type": "mpas",
+    "case_index": 1,
+    "model": "jigsaw",
+    "simplify_hydrosheds_river_network": false,
+    "process_coastline": true,
+    "debug": true,
+    "largest_outlets": 100
+  },
+  "resolutions": {
+    "ocean_km": 30,
+    "land_km": 10,
+    "river_network_km": 10,
+    "coastline_km": 10
+  },
+  "paths": {
+    "input_workspace": {
+      "Windows": "./input",
+      "Linux": "/compyfs/liao313/04model/pyhexwatershed/global",
+      "Darwin": "./input",
+      "default": "./input"
+    },
+    "output_workspace": {
+      "Windows": "./output",
+      "Linux": "/compyfs/liao313/04model/pyhexwatershed/global",
+      "Darwin": "./output",
+      "default": "./output"
+    },
+    "hydrosheds_rivers": {
+      "Windows": "./input/HydroRIVERS_v10.shp",
+      "Linux": "/compyfs/liao313/00raw/hydrology/hydrosheds/hydroriver/HydroRIVERS_v10_shp/HydroRIVERS_v10_shp/HydroRIVERS_v10.shp",
+      "Darwin": "./input/HydroRIVERS_v10.shp",
+      "default": "./input/HydroRIVERS_v10.shp"
+    },
+    "region_geometry": {
+      "Windows": "./input/region.geojson",
+      "Linux": "/qfs/people/liao313/data/hexwatershed/global/vector/region.geojson",
+      "Darwin": "./input/region.geojson",
+      "default": "./input/region.geojson"
+    },
+    "dam_vector": {
+      "Windows": "./input/GRanD_dams_v1_3_merged.geojson",
+      "Linux": "/compyfs/liao313/00raw/dam/GRanD_Version_1_3/GRanD_dams_v1_3_merged.geojson",
+      "Darwin": "./input/GRanD_dams_v1_3_merged.geojson",
+      "default": "./input/GRanD_dams_v1_3_merged.geojson"
+    }
+  },
+  "jigsaw": {
+    "standalone": true,
+    "create_directory": true,
+    "hours": 5,
+    "slurm": "slurm"
+  }
+}

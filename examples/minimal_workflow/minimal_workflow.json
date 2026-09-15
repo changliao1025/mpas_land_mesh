@@ -1,0 +1,56 @@
+{
+  "workflow": {
+    "date": null,
+    "mesh_type": "mpas",
+    "case_index": 1,
+    "model": "jigsaw",
+    "simplify_hydrosheds_river_network": false,
+    "process_coastline": false,
+    "debug": true,
+    "largest_outlets": 10
+  },
+  "resolutions": {
+    "ocean_km": 100,
+    "land_km": 100,
+    "river_network_km": 10,
+    "coastline_km": 10
+  },
+  "paths": {
+    "input_workspace": {
+      "Windows": "./input",
+      "Linux": "./input",
+      "Darwin": "./input",
+      "default": "./input"
+    },
+    "output_workspace": {
+      "Windows": "./output",
+      "Linux": "./output",
+      "Darwin": "./output",
+      "default": "./output"
+    },
+    "hydrosheds_rivers": {
+      "Windows": "./input/HydroRIVERS_v10.gpkg",
+      "Linux": "./input/HydroRIVERS_v10.gpkg",
+      "Darwin": "./input/HydroRIVERS_v10.gpkg",
+      "default": "./input/HydroRIVERS_v10.gpkg"
+    },
+    "region_geometry": {
+      "Windows": "./input/region.geojson",
+      "Linux": "./input/region.geojson",
+      "Darwin": "./input/region.geojson",
+      "default": "./input/region.geojson"
+    },
+    "dam_vector": {
+      "Windows": "./input/dams.geojson",
+      "Linux": "./input/dams.geojson",
+      "Darwin": "./input/dams.geojson",
+      "default": "./input/dams.geojson"
+    }
+  },
+  "jigsaw": {
+    "standalone": true,
+    "create_directory": true,
+    "hours": 5,
+    "slurm": "slurm"
+  }
+}

@@ -5,9 +5,9 @@
 
 #you can change this to your preferred output directory
 import os
-import glob
+import argparse
+import json
 import logging
-from datetime import datetime
 from shutil import copy2
 
 #using standalone dependency for this workflow, which will reduce the dependency to pyearth and pyflowline.
@@ -17,9 +17,10 @@ from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster
 from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER, DRAINAGE_AREA_MULTIPLIER
 
 from mpas_land_mesh.preprocessing.river_network import simplify_hydrorivers_network
-from mpas_land_mesh.preprocessing.coastlines import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
+from mpas_land_mesh.preprocessing.coastline import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
 
 from mpas_land_mesh.utilities.config_manager import create_jigsaw_template_configuration_file, read_jigsaw_configuration_file
+from mpas_land_mesh.utilities.workflow_config import load_workflow_config
 
 # Configure logging
 logging.basicConfig(
@@ -28,69 +29,51 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
-
-##======================================================================
-# The only thing you need to change for different runs is the settings below,
-# which is used to control the resolution and other settings for the mesh generation. You can also set up different flags to turn on/off certain process for debugging purpose. The output will be saved in the same output directory, which is defined below as well.
-# start of common user settings
-##======================================================================
-sDate_today = datetime.now().strftime('%Y%m%d')
-
-#things that may need to be changed for different runs
-sDate_today = '20260601'  #use a fixed date for easy repeatability
-sMesh_type = 'mpas'  #
-#index for different runs
-iCase_index = 1
-sModel = 'jigsaw'
-#flag for component
-
-iFlag_simplify_hydrosheds_river_network = 0
-iFlag_process_coastline = 1
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('config', help='Path to the workflow JSON configuration')
+args = parser.parse_args()
+config = load_workflow_config(args.config)
+workflow = config['workflow']
+resolutions = config['resolutions']
+paths = config['paths']
+jigsaw = config['jigsaw']
+sDate_today = workflow['date']
+sMesh_type = workflow['mesh_type']
+iCase_index = workflow['case_index']
+sModel = workflow['model']
 
 #resolution settings
+#for rivers and watershed
+dResolution_ocean = resolutions['ocean_km']
+dResolution_land = resolutions['land_km']
+dResolution_river_network = resolutions['river_network_km']
+dResolution_coastline = resolutions['coastline_km']
 
-dResolution_ocean = 30
-dResolution_land = 10  #unit in km
-dResolution_river_network = 10
-dResolution_coastline = 10  #unit in km
-
-sWorkspace_output = '/compyfs/liao313/04model/pyhexwatershed/global/'
-
-sFilename_flowline_hydrosheds_in = '/compyfs/liao313/00raw/hydrology/hydrosheds/hydroriver/HydroRIVERS_v10_shp/HydroRIVERS_v10_shp/HydroRIVERS_v10.shp'
-sFilename_geojson_geometery_feature = '/qfs/people/liao313/data/hexwatershed/global/vector/region.geojson'
-
-##======================================================================
-# end of common user settings
-##======================================================================
-##======================================================================
-# start uncommon user settings
-##======================================================================
-iFlag_dam = 0
-sFilename_dam = '/compyfs/liao313/00raw/dam/GRanD_Version_1_3/GRanD_dams_v1_3_merged.geojson' #should consider both on and snapped dams in this dataset
-
-##======================================================================
-# end of uncommon user settings
-##======================================================================
 #for coastline
 dThreshold_area_island = dResolution_ocean * dResolution_ocean * ISLAND_AREA_MULTIPLIER * KM2_TO_M2  #unit m2, this one may need to be adjusted based on the resolution
 dResolution_coastline_buffer = dResolution_coastline * 1.0E3  #buffer zone for coastline line
 #small island removal threshold
 dDrainage_area_threshold = dResolution_land * dResolution_land * DRAINAGE_AREA_MULTIPLIER * KM2_TO_M2  #at least 100 grid cells of drainage area, this may be adjusted as well
 
+#setup flags for debugging
+iFlag_simplify_hydrosheds_river_network = int(workflow['simplify_hydrosheds_river_network'])
+iFlag_process_coastline = int(workflow['process_coastline'])
 
 #number of largest outlet to be processed
-nOutlet_largest = 100
+nOutlet_largest = workflow['largest_outlets']
 
-
+#thing may not need to be changed
+sWorkspace_input = paths['input_workspace']
+sWorkspace_output = paths['output_workspace']
 
 
 #define global output directory
-sWorkspace_river_network_output = '/compyfs/liao313/04model/pyhexwatershed/global/river_network'
+sWorkspace_river_network_output = os.path.join(sWorkspace_output, 'river_network')
 if os.path.exists(sWorkspace_river_network_output) is False:
     os.makedirs(sWorkspace_river_network_output)
 
 
-sWorkspace_coastline_output = '/compyfs/liao313/04model/pyhexwatershed/global/coastline'
+sWorkspace_coastline_output = os.path.join(sWorkspace_output, 'coastline')
 if os.path.exists(sWorkspace_coastline_output) is False:
     os.makedirs(sWorkspace_coastline_output)
 
@@ -121,27 +104,26 @@ sWorkspace_coastline_output = os.path.join(sWorkspace_coastline_output,  sCoastl
 if os.path.exists(sWorkspace_coastline_output) is False:
     os.makedirs(sWorkspace_coastline_output)
 
+
 #Step 1
 #prepare the river network and coastline line dataset
 
-
+sFilename_flowline_hydrosheds_in = paths['hydrosheds_rivers']
 sFilename_flowline_hydroshed_tmp = 'HydroRIVERS_v10_simplified_' + sDistance_tolerance + '_' + sDrainage_area_threshold + '.geojson'
 sFilename_flowline_hydrosheds_out = os.path.join(sWorkspace_river_network_output, sFilename_flowline_hydroshed_tmp)
-sWorkspace_watershed_boundary_in = '/compyfs/liao313/00raw/hydrology/hydrosheds/hydrobasin'
+sFilename_geojson_geometery_feature = paths['region_geometry']
+
 #step 1: record attribute from the MPAS tools
 aField, aValue = get_field_and_value(sFilename_geojson_geometery_feature)
 
+sFilename_dam = paths['dam_vector']
 sFilename_river_network_raster = os.path.join(sWorkspace_river_network_output, 'river_network_raster.tif')
 if iFlag_simplify_hydrosheds_river_network == 1:
-    nOutlet_actual = simplify_hydrorivers_network(sFilename_flowline_hydrosheds_in,
+    simplify_hydrorivers_network(sFilename_flowline_hydrosheds_in,
                        sFilename_flowline_hydrosheds_out,
                        dDistance_tolerance,
                         dDrainage_area_threshold,
                         nOutlet_largest=nOutlet_largest)
-
-    logger.info(f'Processed {nOutlet_actual} largest outlet basins')
-    logger.info(f'Output filename: {sFilename_flowline_hydrosheds_out}')
-
     convert_vector_to_global_raster(sFilename_flowline_hydrosheds_out, sFilename_river_network_raster,
                                          dResolution_x_in, dResolution_y_in )
 else:
@@ -157,7 +139,6 @@ if iFlag_process_coastline == 1:
                                                                              dResolution_coastline_buffer,
                                                                              iRaster_buffer_pixel = 2)
 
-
     ##we need to fix the incompatibilty between hydrosheds and naturalearth
     aFilename_flowline = list()
     for i in range(1, nOutlet_largest+1):
@@ -166,30 +147,47 @@ if iFlag_process_coastline == 1:
         aFilename_flowline.append(sFilename_flowline_simplified_basin)
 
     sFilename_vector_coastline_updated = os.path.join(sWorkspace_coastline_output, 'land_ocean_mask_wo_island_fixed.geojson')
-    fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_merged )
-    #copy the updated coastline file to the merged coastline file for jigsaw mesh generation
+    fix_naturalearth_hydrosheds_incompatibility(aFilename_flowline, sFilename_vector_coastline, sFilename_vector_coastline_updated )
+    #should be merged into one single function
+    merge_features(sFilename_vector_coastline_updated, sFilename_vector_coastline_merged, iFlag_force= True)
     add_field_to_vector_file(sFilename_vector_coastline_merged, aField, aValue)
 else:
     #reuse
     pass
 
+#Step 2 - 4
+#run the hexwatershed model, this step include three steps merged together.
+#for debug purpose, you can also run then one by one, using the iFlag_debug flag to control
+#sFilename_mpas_mesh_netcdf = '/compyfs/liao313/04model/pyhexwatershed/global/pyflowline20251122001/jigsaw/out/invert_mesh.nc'
+
+iFlag_debug = int(workflow['debug'])
 sFilename_jigsaw_configuration_json = os.path.join(sWorkspace_river_network_output, 'jigsaw_configuration.json')
 
-try:
+if iFlag_debug == 1:
+
     create_jigsaw_template_configuration_file(sFilename_jigsaw_configuration_json)
+
     change_json_key_value(sFilename_jigsaw_configuration_json, "sWorkspace_output", sWorkspace_output)
+
     oJigsaw = read_jigsaw_configuration_file(sFilename_jigsaw_configuration_json, \
     iCase_index_in=iCase_index, sDate_in=sDate_today, iFlag_create_directory_in=1)
+
+
     sWorkspace_output_case = oJigsaw.sWorkspace_output
+
     sFilename_jigsaw_configuration_copy = os.path.join( sWorkspace_output_case, 'jigsaw_configuration_copy.json' )
     copy2(sFilename_jigsaw_configuration_json, sFilename_jigsaw_configuration_copy)
+
+
 
     #update the jigsaw configuration file below
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom", "true") # enable geometry control
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_river_network", "true") #set the resolution
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_dam", "true")
+
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac", "true") #enable resolution control
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_ocean", "true")
-    #change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_river_network", "true")
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_river_network", "true")
     #change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_RRS18to6_ocean", "true")
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_land", "true")
     change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_coastline", "true") #set the resolution for coastline line
@@ -199,24 +197,22 @@ try:
     change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_river_network", dResolution_river_network) #set the resolution for river network
     change_json_key_value(sFilename_jigsaw_configuration_copy, "ncolumn_space", ncolumn) #set the resolution for x direction
     change_json_key_value(sFilename_jigsaw_configuration_copy, "nrow_space", nrow) #set the resolution for y direction
+    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_dam_vector", sFilename_dam) #set the dam file
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_vector", sFilename_flowline_hydrosheds_out) #set the resolution for x direction
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_raster", sFilename_river_network_raster) #set the small island removal threshold
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_land_ocean_mask", sFilename_vector_coastline_merged) #set the land ocean mask
+
     change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_coastline_raster", sFilename_tif_wo_island) #set the resolution for y direction
-    if iFlag_dam == 1:
-        change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_dam", "true")
-        change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_dam_vector", sFilename_dam) #set the dam file
 
     #now we can set up the actual pyflowline to create the mesh
     oJigsaw = read_jigsaw_configuration_file(sFilename_jigsaw_configuration_copy,
                     iCase_index_in=iCase_index,
                     sDate_in= sDate_today)
 
-    oJigsaw._jigsaw_create_hpc_job(sSlurm_in = 'slurm', hours_in = 5 )
+    oJigsaw._jigsaw_create_hpc_job(sSlurm_in = jigsaw['slurm'], hours_in = jigsaw['hours'] )
     #now you should manually submit the job
 
-except Exception as e:
-    logger.error(f"An error occurred: {e}")
+else:
+    pass
 
 logger.info('='*80)
 logger.info('Workflow completed successfully!')
