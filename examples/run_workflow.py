@@ -8,10 +8,7 @@ import os
 import argparse
 import json
 import logging
-from shutil import copy2
-
 #using standalone dependency for this workflow, which will reduce the dependency to pyearth and pyflowline.
-from mpas_land_mesh.utilities.change_json_key_value import change_json_key_value
 from mpas_land_mesh.utilities.vector import get_field_and_value, merge_features, add_field_to_vector_file
 from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster
 from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER, DRAINAGE_AREA_MULTIPLIER
@@ -19,8 +16,7 @@ from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER
 from mpas_land_mesh.preprocessing.river_network import simplify_hydrorivers_network
 from mpas_land_mesh.preprocessing.coastline import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
 
-from mpas_land_mesh.utilities.config_manager import create_jigsaw_template_configuration_file, read_jigsaw_configuration_file
-from mpas_land_mesh.utilities.workflow_config import load_workflow_config
+from mpas_land_mesh.utilities.config import load_workflow_config, create_jigsaw_case
 
 # Configure logging
 logging.basicConfig(
@@ -161,55 +157,24 @@ else:
 #sFilename_mpas_mesh_netcdf = '/compyfs/liao313/04model/pyhexwatershed/global/pyflowline20251122001/jigsaw/out/invert_mesh.nc'
 
 iFlag_debug = int(workflow['debug'])
-sFilename_jigsaw_configuration_json = os.path.join(sWorkspace_river_network_output, 'jigsaw_configuration.json')
-
 if iFlag_debug == 1:
+    generated_files = {
+        'river_network_vector': sFilename_flowline_hydrosheds_out,
+        'river_network_raster': sFilename_river_network_raster,
+        'coastline_raster': sFilename_tif_wo_island,
+        'dam_vector': sFilename_dam,
+    }
 
-    create_jigsaw_template_configuration_file(sFilename_jigsaw_configuration_json)
+    # Build JIGSAW deck in memory and create case instance directly
+    oJigsaw = create_jigsaw_case(
+        config,
+        generated_files=generated_files,
+        output_workspace=sWorkspace_output,
+        iFlag_create_directory_in=1,
+    )
 
-    change_json_key_value(sFilename_jigsaw_configuration_json, "sWorkspace_output", sWorkspace_output)
-
-    oJigsaw = read_jigsaw_configuration_file(sFilename_jigsaw_configuration_json, \
-    iCase_index_in=iCase_index, sDate_in=sDate_today, iFlag_create_directory_in=1)
-
-
-    sWorkspace_output_case = oJigsaw.sWorkspace_output
-
-    sFilename_jigsaw_configuration_copy = os.path.join( sWorkspace_output_case, 'jigsaw_configuration_copy.json' )
-    copy2(sFilename_jigsaw_configuration_json, sFilename_jigsaw_configuration_copy)
-
-
-
-    #update the jigsaw configuration file below
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom", "true") # enable geometry control
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_river_network", "true") #set the resolution
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_geom_dam", "true")
-
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac", "true") #enable resolution control
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_ocean", "true")
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_river_network", "true")
-    #change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_RRS18to6_ocean", "true")
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_land", "true")
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "iFlag_spac_coastline", "true") #set the resolution for coastline line
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_ocean", dResolution_ocean) #set the resolution for ocean
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_coastline", dResolution_coastline) #set the resolution for coastline line
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_land", dResolution_land) #set the resolution for land
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "dResolution_river_network", dResolution_river_network) #set the resolution for river network
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "ncolumn_space", ncolumn) #set the resolution for x direction
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "nrow_space", nrow) #set the resolution for y direction
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_dam_vector", sFilename_dam) #set the dam file
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_vector", sFilename_flowline_hydrosheds_out) #set the resolution for x direction
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_river_network_raster", sFilename_river_network_raster) #set the small island removal threshold
-
-    change_json_key_value(sFilename_jigsaw_configuration_copy, "sFilename_coastline_raster", sFilename_tif_wo_island) #set the resolution for y direction
-
-    #now we can set up the actual pyflowline to create the mesh
-    oJigsaw = read_jigsaw_configuration_file(sFilename_jigsaw_configuration_copy,
-                    iCase_index_in=iCase_index,
-                    sDate_in= sDate_today)
-
-    oJigsaw._jigsaw_create_hpc_job(sSlurm_in = jigsaw['slurm'], hours_in = jigsaw['hours'] )
-    #now you should manually submit the job
+    oJigsaw._jigsaw_create_hpc_job(sSlurm_in=jigsaw['slurm'], hours_in=jigsaw['hours'])
+    # now you should manually submit the job
 
 else:
     pass

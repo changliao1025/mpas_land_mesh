@@ -154,10 +154,18 @@ class jigsawcase:
         import json
 
         if self.sFilename_model_configuration is None:
-            raise ValueError("sFilename_model_configuration is not set")
-
-        with open(self.sFilename_model_configuration, "r") as f:
-            aConfig = json.load(f)
+            if self.aConfig_jigsaw is not None:
+                aConfig = self.aConfig_jigsaw
+                cfg_path = os.path.join(self.sWorkspace_output, "jigsaw_configuration.json")
+                Path(self.sWorkspace_output).mkdir(parents=True, exist_ok=True)
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    json.dump(aConfig, f, indent=4)
+                self.sFilename_model_configuration = cfg_path
+            else:
+                raise ValueError("Neither sFilename_model_configuration nor aConfig_jigsaw is set")
+        else:
+            with open(self.sFilename_model_configuration, "r", encoding="utf-8") as f:
+                aConfig = json.load(f)
 
         projector = [0.0, 0.0]
         geom, gprj, mesh, mprj = run_jigsaw(
@@ -211,6 +219,12 @@ class jigsawcase:
         home_dir = Path.home()
         sConda_env_path, sConda_env_name, env_type = get_python_environment()
 
+        if self.sFilename_model_configuration is None and self.aConfig_jigsaw is not None:
+            cfg_path = os.path.join(self.sWorkspace_output, "jigsaw_configuration.json")
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                json.dump(self.aConfig_jigsaw, f, indent=4)
+            self.sFilename_model_configuration = cfg_path
+
         # ------------------------------------------------------------------
         # Part 1 – Python driver script (run_jigsaw.py)
         # ------------------------------------------------------------------
@@ -224,7 +238,7 @@ class jigsawcase:
         sLine = (
             f"#!{python_exe_path}\n"
             )
-        
+
         ofs_jigsaw.write(sLine)
         sLine = "import os" + "\n"
         ofs_jigsaw.write(sLine)

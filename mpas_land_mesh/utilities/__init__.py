@@ -89,13 +89,19 @@ from .spatial_reference import (
     reproject_coordinates_batch,
 )
 
-# --- config_manager ---
-from .config_manager import (
-    jigsawcase,
+# --- config (unified) ---
+from .config import (
+    DEFAULT_CONFIG,
+    DEFAULT_JIGSAW_CONFIG,
+    DEFAULT_WORKFLOW_CONFIG,
     JigsawConfigManager,
+    WorkflowConfig,
+    create_jigsaw_case,
     create_jigsaw_template_configuration_file,
+    load_workflow_config,
     read_jigsaw_configuration_file,
 )
+from mpas_land_mesh.classes.jigsawcase import jigsawcase
 
 # --- change_json_key_value ---
 from .change_json_key_value import (
@@ -163,7 +169,13 @@ __all__ = [
     # spatial_reference
     "reproject_coordinates",
     "reproject_coordinates_batch",
-    # config_manager
+    # config (unified)
+    "DEFAULT_CONFIG",
+    "DEFAULT_JIGSAW_CONFIG",
+    "DEFAULT_WORKFLOW_CONFIG",
+    "WorkflowConfig",
+    "load_workflow_config",
+    "create_jigsaw_case",
     "jigsawcase",
     "JigsawConfigManager",
     "create_jigsaw_template_configuration_file",

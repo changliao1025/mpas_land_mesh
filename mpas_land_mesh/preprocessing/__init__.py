@@ -16,27 +16,27 @@ directly when needed::
     )
 """
 
-from .river_networks import (
+from .river_network import (
     convert_geometry_flowline,
     precompute_flowline_geometries,
     precompute_flowline_geometries_by_segment,
-    simplify_hydrorivers_networks,
+    simplify_hydrorivers_network,
     get_outlet_location,
     tag_river_outlet,
 )
 
 __all__ = [
-    # river_networks
+    # river_network
     'convert_geometry_flowline',
     'precompute_flowline_geometries',
     'precompute_flowline_geometries_by_segment',
-    'simplify_hydrorivers_networks',
+    'simplify_hydrorivers_network',
     'get_outlet_location',
     'tag_river_outlet',
 ]
 
 try:
-    from .coastlines import (
+    from .coastline import (
         create_land_ocean_mask,
         create_land_ocean_mask_from_naturalearth,
         geometries_bbox_overlap,
