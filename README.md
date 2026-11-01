@@ -9,13 +9,15 @@ This module is part of the layered geospatial mesh architecture:
 mpas_land_mesh (land-river mesh workflows)
   ├── pyearthmesh (unstructured & structured mesh generation, JIGSAW, workflow compiler)
   │     └── pyearth (foundational GIS, geometry, raster, vector, system)
-  ├── pyearth (shared GIS and scientific utilities)
-  └── pyearthriver (river network topology, flowlines, rivergraphs)
+  ├── pyearthbuffer (geodesic GCS buffer operations)
+  ├── pyearthriver (river network topology, flowlines, rivergraphs)
+  └── pyearth (shared GIS and scientific utilities)
 ```
 
 - **`pyearth`**: Foundation layer providing spatial references, geometry, GDAL raster/vector I/O, format conversion, and system environment utilities.
 - **`pyearthmesh`**: Unstructured (MPAS, JIGSAW) and structured mesh generation, workflow configuration schemas, and compilation.
 - **`pyearthriver`**: River network processing, flowline graphs, and hydrological features.
+- **`pyearthbuffer`**: Geodesic buffer calculations on the WGS84 ellipsoid for GCS vector data.
 - **`mpas_land_mesh`**: High-level unified land-river mesh workflow execution, coastline/ocean masking, and basin/river network simplification.
 
 ## Structure
@@ -36,13 +38,13 @@ mpas_land_mesh/
 └── utilities/                      # Domain-specific utilities
     ├── __init__.py
     ├── constants.py                # Physical and geometric constants
-    ├── gcsbuffer.py                # Geographic buffer utilities
     └── mesh_stats.py               # MPAS mesh statistics
 ```
 
 > **Note on imports:** Data classes and core capabilities are shared across packages:
 > - Base geometry and topology (`pyvertex`, `pyedge`, `pynvector`), GIS, vector, raster, and spatial references are provided by `pyearth`.
 > - River network topology (`pyrivergraph`, `pyflowline`, `pyconfluence`) and export functions are provided by `pyearthriver`.
+> - Geodesic buffer operations on GCS WGS84 are provided by `pyearthbuffer`.
 > - Mesh cell definitions (`pympas`, `pycelllink`, `pymeshcell`), mesh algorithms, and workflow configuration are provided by `pyearthmesh`.
 
 ## Key Dependencies
@@ -51,6 +53,7 @@ Minimal required packages:
 - `pyearth` — foundational GIS, geometry, raster, vector, and spatial reference
 - `pyearthmesh` — unstructured/structured mesh generation and workflow configuration
 - `pyearthriver` — river network structures and flowlines
+- `pyearthbuffer` — geodesic buffer calculations
 - `gdal` / `osgeo` — geospatial data processing
 - `numpy>=1.20.0` — array operations
 - `scipy>=1.7.0` — spatial operations
@@ -58,14 +61,6 @@ Minimal required packages:
 - `rtree` — spatial indexing for river network processing
 
 ## Core Functions
-
-### Geographic Buffer Utilities (`mpas_land_mesh.utilities`)
-- `meters_to_degrees()` — convert metres to degrees at a given latitude
-- `create_geometry_buffer_degrees()` — buffer an OGR geometry in degrees
-- `create_wkt_buffer_degrees()` — buffer a WKT geometry in degrees
-- `create_wkt_buffer_distance()` — buffer a WKT geometry by a metric distance
-- `create_file_buffer_degrees()` — buffer all features in a vector file
-- `create_buffer_with_meter_distance()` — buffer a vector file in metres
 
 ### Mesh Statistics (`mpas_land_mesh.utilities`)
 - `get_mesh_stats()` — compute mesh cell count, resolution, and area metrics from MPAS NetCDF
@@ -142,6 +137,7 @@ See [`examples/run_minimal_workflow.py`](../examples/run_minimal_workflow.py) fo
 | Package | Role |
 |---|---|
 | `pyearth` | Foundational GIS, geometry, coordinate transforms, raster/vector operations |
+| `pyearthbuffer` | Geodesic buffer calculations on WGS84 for GCS vector data |
 | `pyearthriver` | Hydrological flowline data structures, river networks, vector exports |
 | `pyearthmesh` | Unstructured and structured mesh generation, JIGSAW wrapper, config schema |
 | `mpas_land_mesh` | Unified Land-River Mesh (ULRM) preprocessing, masking, workflow execution |

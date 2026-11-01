@@ -30,6 +30,7 @@ except Exception:  # pragma: no cover - environment-dependent
 from datetime import datetime
 
 from pyearth.gis.geometry import calculate_distance_based_on_longitude_latitude
+from pyearthbuffer import gcsbuffer
 from pyearthmesh.classes.edge import pyedge
 from pyearthmesh.classes.vertex import pyvertex
 from pyearthmesh.utility.change_json_key_value import change_json_key_value
@@ -38,8 +39,6 @@ from pyearthriver.classes.rivergraph import pyrivergraph
 from pyearthriver.formats.export_flowline import (
     export_flowline_to_vector as export_flowline_to_geojson,
 )
-
-from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -95,18 +94,12 @@ def precompute_flowline_geometries(
     # buffer_cache = {}
     for i, pFlowline in enumerate(aFlowlines):
         wkt = pFlowline.wkt
-        wkt_buffer = create_wkt_buffer_distance(
-            wkt,
-            dDistance_tolerance,
-            reference_latitude=pFlowline.pVertex_end.dLatitude_degree,
-        )
-        pBuffer = ogr.CreateGeometryFromWkt(wkt_buffer)
+        pBuffer = gcsbuffer(wkt, dDistance_tolerance, output_format="ogr")
         pBound0 = pBuffer.GetEnvelope()
         dLon_min, dLon_max, dLat_min, dLat_max = pBound0
         pBound = (dLon_min, dLat_min, dLon_max, dLat_max)
         bounds_cache[pFlowline.lFlowlineID] = pBound
-        # buffer_cache[pFlowline.lFlowlineID] = wkt_buffer
-    return bounds_cache  # , buffer_cache
+    return bounds_cache
 
 
 def precompute_flowline_geometries_by_segment(
@@ -122,23 +115,16 @@ def precompute_flowline_geometries_by_segment(
     """
     logger.info(f"Precomputing geometries for {len(aFlowlines)} flowlines...")
     bounds_cache = {}
-    # buffer_cache = {}
     for i, pFlowline in enumerate(aFlowlines):
         wkt = pFlowline.wkt
         # if pFlowline.iStream_segment == 580:
         #    print('debugging flowline: ', pFlowline.lFlowlineID, pFlowline.iStream_segment)
-        wkt_buffer = create_wkt_buffer_distance(
-            wkt,
-            dDistance_tolerance,
-            reference_latitude=pFlowline.pVertex_end.dLatitude_degree,
-        )
-        pBuffer = ogr.CreateGeometryFromWkt(wkt_buffer)
+        pBuffer = gcsbuffer(wkt, dDistance_tolerance, output_format="ogr")
         pBound0 = pBuffer.GetEnvelope()
         dLon_min, dLon_max, dLat_min, dLat_max = pBound0
         pBound = (dLon_min, dLat_min, dLon_max, dLat_max)
         bounds_cache[pFlowline.iStream_segment] = pBound
-        # buffer_cache[pFlowline.lFlowlineID] = wkt_buffer
-    return bounds_cache  # , buffer_cache
+    return bounds_cache
 
 
 def simplify_hydrorivers_network(

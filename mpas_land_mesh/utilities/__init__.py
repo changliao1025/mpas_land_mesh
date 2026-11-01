@@ -28,16 +28,6 @@ from .constants import (
     earth_radius,
 )
 
-# --- gcsbuffer ---
-from .gcsbuffer import (
-    create_buffer_with_meter_distance,
-    create_file_buffer_degrees,
-    create_geometry_buffer_degrees,
-    create_wkt_buffer_degrees,
-    create_wkt_buffer_distance,
-    meters_to_degrees,
-)
-
 # --- mesh_stats ---
 from .mesh_stats import get_mesh_stats
 
@@ -50,13 +40,6 @@ __all__ = [
     "ISLAND_AREA_MULTIPLIER",
     "KM2_TO_M2",
     "earth_radius",
-    # gcsbuffer
-    "meters_to_degrees",
-    "create_geometry_buffer_degrees",
-    "create_wkt_buffer_degrees",
-    "create_wkt_buffer_distance",
-    "create_file_buffer_degrees",
-    "create_buffer_with_meter_distance",
     # mesh_stats
     "get_mesh_stats",
     # config (pyearthmesh unified)

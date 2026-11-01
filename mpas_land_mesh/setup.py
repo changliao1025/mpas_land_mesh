@@ -44,6 +44,8 @@ setup(
         "pyearth>=0.2.1",
         "pyearthmesh>=0.1.1",
         "pyearthriver>=0.1.0",
+        "pyearthbuffer>=0.1.0",
+        "geographiclib>=2.0",
     ],
     extras_require={
         "gdal": ["gdal>=3.0.0"],

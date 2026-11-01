@@ -42,8 +42,7 @@ from pyearth.toolbox.management.vector.remove_internal_polygon import (
 from pyearth.toolbox.management.vector.remove_small_polygon import (
     remove_small_polygon,
 )
-
-from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
+from pyearthbuffer import gcsbuffer
 
 if gdal is not None:
     gdal.UseExceptions()
@@ -352,7 +351,6 @@ def fix_naturalearth_hydrosheds_incompatibility(
 
                 if sGeometry_type == "LINESTRING":
                     nOutside_count += 1
-                    sWkt = outside_flowline.ExportToWkt()
                     point_start = outside_flowline.GetPoint(0)
                     point_end = outside_flowline.GetPoint(
                         outside_flowline.GetPointCount() - 1
@@ -360,14 +358,11 @@ def fix_naturalearth_hydrosheds_incompatibility(
                     distance = calculate_distance_based_on_longitude_latitude(
                         point_start[0], point_start[1], point_end[0], point_end[1]
                     )
-                    reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                    sWkt_buffer_polygon = create_wkt_buffer_distance(
-                        sWkt,
-                        distance / 2.0,
-                        epsg=4326,
-                        reference_latitude=reference_latitude,
+                    if distance <= 0:
+                        continue
+                    pBuffer_geometry = gcsbuffer(
+                        outside_flowline, distance / 2.0, output_format="ogr"
                     )
-                    pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
                     aBuffer_geometries.append(pBuffer_geometry)
 
                     # --- debug ---
@@ -395,7 +390,6 @@ def fix_naturalearth_hydrosheds_incompatibility(
                         if outside_part_i is None or outside_part_i.IsEmpty():
                             continue
                         nOutside_count += 1
-                        sWkt = outside_part_i.ExportToWkt()
                         point_start = outside_part_i.GetPoint(0)
                         point_end = outside_part_i.GetPoint(
                             outside_part_i.GetPointCount() - 1
@@ -403,15 +397,10 @@ def fix_naturalearth_hydrosheds_incompatibility(
                         distance = calculate_distance_based_on_longitude_latitude(
                             point_start[0], point_start[1], point_end[0], point_end[1]
                         )
-                        reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                        sWkt_buffer_polygon = create_wkt_buffer_distance(
-                            sWkt,
-                            distance / 2.0,
-                            epsg=4326,
-                            reference_latitude=reference_latitude,
-                        )
-                        pBuffer_geometry = ogr.CreateGeometryFromWkt(
-                            sWkt_buffer_polygon
+                        if distance <= 0:
+                            continue
+                        pBuffer_geometry = gcsbuffer(
+                            outside_part_i, distance / 2.0, output_format="ogr"
                         )
                         aBuffer_geometries.append(pBuffer_geometry)
 
@@ -449,7 +438,6 @@ def fix_naturalearth_hydrosheds_incompatibility(
 
                 if sGeometry_type == "LINESTRING":
                     nOutside_count += 1
-                    sWkt = outside_flowline.ExportToWkt()
                     point_start = outside_flowline.GetPoint(0)
                     point_end = outside_flowline.GetPoint(
                         outside_flowline.GetPointCount() - 1
@@ -457,14 +445,11 @@ def fix_naturalearth_hydrosheds_incompatibility(
                     distance = calculate_distance_based_on_longitude_latitude(
                         point_start[0], point_start[1], point_end[0], point_end[1]
                     )
-                    reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                    sWkt_buffer_polygon = create_wkt_buffer_distance(
-                        sWkt,
-                        distance / 2.0,
-                        epsg=4326,
-                        reference_latitude=reference_latitude,
+                    if distance <= 0:
+                        continue
+                    pBuffer_geometry = gcsbuffer(
+                        outside_flowline, distance / 2.0, output_format="ogr"
                     )
-                    pBuffer_geometry = ogr.CreateGeometryFromWkt(sWkt_buffer_polygon)
                     aBuffer_geometries.append(pBuffer_geometry)
 
                     # --- debug ---
@@ -492,7 +477,6 @@ def fix_naturalearth_hydrosheds_incompatibility(
                         if outside_part_i is None or outside_part_i.IsEmpty():
                             continue
                         nOutside_count += 1
-                        sWkt = outside_part_i.ExportToWkt()
                         point_start = outside_part_i.GetPoint(0)
                         point_end = outside_part_i.GetPoint(
                             outside_part_i.GetPointCount() - 1
@@ -500,15 +484,10 @@ def fix_naturalearth_hydrosheds_incompatibility(
                         distance = calculate_distance_based_on_longitude_latitude(
                             point_start[0], point_start[1], point_end[0], point_end[1]
                         )
-                        reference_latitude = (point_start[1] + point_end[1]) / 2.0
-                        sWkt_buffer_polygon = create_wkt_buffer_distance(
-                            sWkt,
-                            distance / 2.0,
-                            epsg=4326,
-                            reference_latitude=reference_latitude,
-                        )
-                        pBuffer_geometry = ogr.CreateGeometryFromWkt(
-                            sWkt_buffer_polygon
+                        if distance <= 0:
+                            continue
+                        pBuffer_geometry = gcsbuffer(
+                            outside_part_i, distance / 2.0, output_format="ogr"
                         )
                         aBuffer_geometries.append(pBuffer_geometry)
 
