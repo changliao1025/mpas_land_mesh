@@ -1,10 +1,11 @@
-import os
 import math
-import numpy as np
-from osgeo import ogr, osr, gdal
+import os
 
-from mpas_land_mesh.mesh.mpas.convert_attributes import convert_gcs_attributes_to_cell
+import numpy as np
+from osgeo import gdal, ogr, osr
+
 from mpas_land_mesh.mesh.jigsaw.run_jigsaw import run_jigsaw
+from mpas_land_mesh.mesh.mpas.convert_attributes import convert_gcs_attributes_to_cell
 from mpas_land_mesh.utilities.geometry import (
     convert_360_to_180,
     split_international_date_line_polygon_coordinates,
@@ -28,7 +29,7 @@ def calculate_potentiometric(dBed_elevation_in, dIce_thickness_in):
     Returns:
         float: Potentiometric surface elevation in meters
     """
-    dDensity_ice = 917.0   # kg/m^3
+    dDensity_ice = 917.0  # kg/m^3
     dDensity_water = 1000.0  # kg/m^3
     dRatio = dDensity_ice / dDensity_water
     dPotentiometric = dBed_elevation_in + dRatio * dIce_thickness_in
@@ -392,21 +393,35 @@ def create_mpas_mesh(
                     continue
 
                 lCellID = int(aIndexToCellID[i])
-                dElevation_mean = float(aBed_elevation[i]) if iFlag_bed_elevation == 1 else 0.0
-                dElevation_profile0 = (
-                    float(aBed_elevation_profile[i, 0]) if iFlag_elevation_profile == 1 else 0.0
+                dElevation_mean = (
+                    float(aBed_elevation[i]) if iFlag_bed_elevation == 1 else 0.0
                 )
-                dThickness_ice = float(aIce_thickness[i]) if iFlag_ice_thickness == 1 else 0.0
+                dElevation_profile0 = (
+                    float(aBed_elevation_profile[i, 0])
+                    if iFlag_elevation_profile == 1
+                    else 0.0
+                )
+                dThickness_ice = (
+                    float(aIce_thickness[i]) if iFlag_ice_thickness == 1 else 0.0
+                )
                 dArea = float(aCellArea[i])
 
                 if dThickness_ice > 0:
-                    dElevation_mean = calculate_potentiometric(dElevation_mean, dThickness_ice)
+                    dElevation_mean = calculate_potentiometric(
+                        dElevation_mean, dThickness_ice
+                    )
                     dElevation_profile0 = calculate_potentiometric(
                         dElevation_profile0, dThickness_ice
                     )
 
                 iFlag_success, aMpas = add_cell_into_list(
-                    aMpas, i, lCellID, dArea, dElevation_mean, dElevation_profile0, aCoords_gcs
+                    aMpas,
+                    i,
+                    lCellID,
+                    dArea,
+                    dElevation_mean,
+                    dElevation_profile0,
+                    aCoords_gcs,
                 )
                 if iFlag_success == 1:
                     aMpas_dict[lCellID] = lCellIndex

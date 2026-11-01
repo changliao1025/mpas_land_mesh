@@ -1,7 +1,7 @@
 import geojson
 import numpy as np
-from osgeo import ogr
 from jigsawpy import jigsaw_msh_t, savemsh
+from osgeo import ogr
 
 
 def pointgeo(point, nset, eset, nobj, last):

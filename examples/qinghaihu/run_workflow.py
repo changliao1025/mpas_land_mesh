@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Qinghai Lake (Qinghaihu) MPAS mesh workflow (config-driven workflow).
 
@@ -36,7 +35,9 @@ def main() -> None:
         if not sFilename_workflow.exists():
             sFilename_workflow = Path(__file__).with_name("workflow_config.json")
         if not sFilename_workflow.exists():
-            sFilename_workflow = Path(__file__).with_name("ocn100coast10lnd5riv4lak3.json")
+            sFilename_workflow = Path(__file__).with_name(
+                "ocn100coast10lnd5riv4lak3.json"
+            )
 
     print("Step 1: Loading workflow configuration...")
     print(f"   * {sFilename_workflow}")
@@ -53,7 +54,9 @@ def main() -> None:
         oWorkflow.create_hpc_job()
         print(f"   * run_mpas.py  written to: {oWorkflow.output_workspace}")
         print(f"   * submit.job   written to: {oWorkflow.output_workspace}")
-        print(f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}")
+        print(
+            f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}"
+        )
     else:
         print("\nStep 3 (local): Setting up MPAS workspace...")
         oWorkflow.setup()

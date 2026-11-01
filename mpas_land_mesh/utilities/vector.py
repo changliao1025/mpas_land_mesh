@@ -5,32 +5,33 @@ Minimal implementations of vector processing functions
 extracted from pyearth.toolbox and hexwatershed_utility
 """
 
-import os
 import logging
+import os
 import time
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple, Union
+
 import numpy as np
 
+_GDAL_IMPORT_ERROR: Optional[Exception] = None
 try:
-    from osgeo import ogr, osr, gdal
+    import osgeo
+    from osgeo import gdal, ogr, osr
 except Exception as exc:  # pragma: no cover - environment-dependent
+    osgeo = None
     ogr = None
     osr = None
     gdal = None
     _GDAL_IMPORT_ERROR = exc
 else:
-    _GDAL_IMPORT_ERROR = None
-
     gdal.UseExceptions()
 
 from functools import lru_cache
 
-from mpas_land_mesh.utilities.system import get_extension_from_path
+from mpas_land_mesh.utilities.constants import IDL_threshold
 from mpas_land_mesh.utilities.geometry import (
     calculate_polygon_area,
 )
-from mpas_land_mesh.utilities.constants import IDL_threshold
-
+from mpas_land_mesh.utilities.system import get_extension_from_path
 
 SUPPORTED_VECTOR_FORMATS = {
     ".geojson": "GeoJSON",
@@ -240,7 +241,7 @@ def get_extension_from_vector_format(format_name: str) -> str:
     return format_to_extension[format_name]
 
 
-def get_vector_driver_from_format(file_format: str) :
+def get_vector_driver_from_format(file_format: str):
     """
     Get the OGR driver based on the provided vector file format.
 
@@ -259,7 +260,7 @@ def get_vector_driver_from_format(file_format: str) :
     return driver
 
 
-def get_vector_driver_from_filename(filename: str) :
+def get_vector_driver_from_filename(filename: str):
     """
     Get the OGR driver based on file extension.
 
@@ -488,7 +489,7 @@ def convert_vector_format(
                 iFlag_transform = 1
                 logger.info("Coordinate transformation required")
                 # GDAL 3+ axis-order fix
-                if int(osgeo.__version__[0]) >= 3:
+                if osgeo is not None and int(osgeo.__version__.split(".")[0]) >= 3:
                     pSrs_in.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
                     pSrs_out.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
                 transform = osr.CoordinateTransformation(pSrs_in, pSrs_out)
@@ -575,7 +576,9 @@ def convert_vector_format(
             try:
                 pGeometry.Transform(transform)
             except Exception as exc:
-                logger.warning(f"Failed to transform feature {nProcessed}: {exc}, skipping")
+                logger.warning(
+                    f"Failed to transform feature {nProcessed}: {exc}, skipping"
+                )
                 continue
 
         pFeature_out = ogr.Feature(pLayer_out.GetLayerDefn())
@@ -598,7 +601,9 @@ def convert_vector_format(
     pLayer_out = None
     pDataset_out = None
 
-    logger.info(f"Conversion complete: {nProcessed} features written to {sFilename_vector_out}")
+    logger.info(
+        f"Conversion complete: {nProcessed} features written to {sFilename_vector_out}"
+    )
     return True
 
 
@@ -612,7 +617,7 @@ def get_field_and_value(sFilename_in):
     Returns:
         tuple: (field_names, field_values)
     """
-    pDriver = ogr.GetDriverByName('GeoJSON')
+    pDriver = ogr.GetDriverByName("GeoJSON")
     pDataset = pDriver.Open(sFilename_in, 0)
 
     if pDataset is None:
@@ -691,7 +696,9 @@ def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
         iFlag_force (bool): Overwrite existing output file
     """
     if os.path.exists(sFilename_out) and not iFlag_force:
-        print(f"Warning: Output file {sFilename_out} already exists and will be overwritten")
+        print(
+            f"Warning: Output file {sFilename_out} already exists and will be overwritten"
+        )
         os.remove(sFilename_out)
 
     pDataset_in = ogr.Open(sFilename_in, 0)
@@ -702,13 +709,13 @@ def merge_features(sFilename_in, sFilename_out, iFlag_force=False):
     pSpatialRef = pLayer_in.GetSpatialRef()
 
     # Create output
-    pDriver = ogr.GetDriverByName('GeoJSON')
+    pDriver = ogr.GetDriverByName("GeoJSON")
 
     if os.path.exists(sFilename_out):
         pDriver.DeleteDataSource(sFilename_out)
 
     pDataset_out = pDriver.CreateDataSource(sFilename_out)
-    pLayer_out = pDataset_out.CreateLayer('merged', pSpatialRef, ogr.wkbMultiPolygon)
+    pLayer_out = pDataset_out.CreateLayer("merged", pSpatialRef, ogr.wkbMultiPolygon)
 
     # Collect all geometries, fixing validity to prevent topological holes
     aGeometry = []
@@ -785,7 +792,7 @@ def write_wkt_to_vector_file(wkt, sFilename_out, iEPSG_in=4326):
         sFilename_out (str): Output file path
         iEPSG_in (int): EPSG code for spatial reference
     """
-    pDriver = ogr.GetDriverByName('GeoJSON')
+    pDriver = ogr.GetDriverByName("GeoJSON")
 
     if os.path.exists(sFilename_out):
         pDriver.DeleteDataSource(sFilename_out)
@@ -794,7 +801,7 @@ def write_wkt_to_vector_file(wkt, sFilename_out, iEPSG_in=4326):
     pSpatialRef.ImportFromEPSG(iEPSG_in)
 
     pDataset = pDriver.CreateDataSource(sFilename_out)
-    pLayer = pDataset.CreateLayer('boundary', pSpatialRef, ogr.wkbPolygon)
+    pLayer = pDataset.CreateLayer("boundary", pSpatialRef, ogr.wkbPolygon)
 
     pGeometry = ogr.CreateGeometryFromWkt(wkt)
 
@@ -809,7 +816,7 @@ def write_wkt_to_vector_file(wkt, sFilename_out, iEPSG_in=4326):
 def remove_small_polygon(
     sFilename_vector_in: str,
     sFilename_vector_out: str,
-    dThreshold_in: Union[float, int], # in square meters
+    dThreshold_in: Union[float, int],  # in square meters
     iFlag_algorithm: int = 2,
     verbose: bool = True,
     progress_interval: int = 1000,
@@ -929,7 +936,7 @@ def remove_small_polygon(
         raise RuntimeError(f"Failed to determine vector format: {e}")
 
     if pDriver_out is None:
-        available_formats = print_supported_vector_formats()
+        available_formats = list(get_available_vector_formats().keys())
         raise ValueError(
             f"Output format '{sFormat_out}' is not supported. "
             f"Available formats: {available_formats}"
@@ -1105,8 +1112,9 @@ def remove_small_polygon(
         pDataSource_in = None
 
 
-def remove_internal_polygon( sFilename_vector_in: str,
-    sFilename_vector_out: str, verbose: bool = True):
+def remove_internal_polygon(
+    sFilename_vector_in: str, sFilename_vector_out: str, verbose: bool = True
+):
     # Input validation
     if not isinstance(sFilename_vector_in, str) or not sFilename_vector_in.strip():
         raise ValueError("Input filename must be a non-empty string")
@@ -1135,7 +1143,7 @@ def remove_internal_polygon( sFilename_vector_in: str,
         raise RuntimeError(f"Failed to determine vector format: {e}")
 
     if pDriver_out is None:
-        available_formats = print_supported_vector_formats()
+        available_formats = list(get_available_vector_formats().keys())
         raise ValueError(
             f"Output format '{sFormat_out}' is not supported. "
             f"Available formats: {available_formats}"
@@ -1207,7 +1215,9 @@ def remove_internal_polygon( sFilename_vector_in: str,
                     continue
 
                 # Check if the polygon has holes (internal rings); if so, rebuild with outer ring only
-                print(f"Processing feature {i} with geometry type: {pGeometry_in.GetGeometryName()}")
+                print(
+                    f"Processing feature {i} with geometry type: {pGeometry_in.GetGeometryName()}"
+                )
                 sGeometryType = pGeometry_in.GetGeometryName()
                 pGeometry_in.GetGeometryType()
                 if sGeometryType == "POLYGON":
@@ -1259,16 +1269,17 @@ def remove_internal_polygon( sFilename_vector_in: str,
         # Clean up input datasource
         pDataSource_in = None
 
+
 def _process_single_polygon(
-    pGeometry: 'ogr.Geometry',
+    pGeometry: "ogr.Geometry",
     dThreshold: float,
     iFlag_algorithm: int,
-    pSrs: 'osr.SpatialReference',
-    pLayerDefn_out: 'ogr.FeatureDefn',
-    pFeature_in: 'ogr.Feature',
-    pLayerDefn_in: 'ogr.FeatureDefn',
+    pSrs: "osr.SpatialReference",
+    pLayerDefn_out: "ogr.FeatureDefn",
+    pFeature_in: "ogr.Feature",
+    pLayerDefn_in: "ogr.FeatureDefn",
     lID: int,
-    pLayer_out: 'ogr.Layer',
+    pLayer_out: "ogr.Layer",
 ) -> bool:
     """
     Process a single POLYGON geometry.
@@ -1292,7 +1303,9 @@ def _process_single_polygon(
         # If it is, keep it regardless of area since it might be split and actual area is larger
         lon_coords = aCoords_outer[:, 0]
 
-        is_near_antimeridian = np.any( np.abs(np.abs(lon_coords[:-1]) - 180.0) < IDL_threshold )
+        is_near_antimeridian = np.any(
+            np.abs(np.abs(lon_coords[:-1]) - 180.0) < IDL_threshold
+        )
 
         if is_near_antimeridian:
             # Keep polygon near antimeridian without area check
@@ -1365,15 +1378,15 @@ def _process_single_polygon(
 
 
 def _process_multipolygon(
-    pGeometry: 'ogr.Geometry',
+    pGeometry: "ogr.Geometry",
     dThreshold: float,
     iFlag_algorithm: int,
-    pSrs: 'osr.SpatialReference',
-    pLayerDefn_out: 'ogr.FeatureDefn',
-    pFeature_in: 'ogr.Feature',
-    pLayerDefn_in: 'ogr.FeatureDefn',
+    pSrs: "osr.SpatialReference",
+    pLayerDefn_out: "ogr.FeatureDefn",
+    pFeature_in: "ogr.Feature",
+    pLayerDefn_in: "ogr.FeatureDefn",
     lID_start: int,
-    pLayer_out: 'ogr.Layer',
+    pLayer_out: "ogr.Layer",
 ) -> int:
     """
     Process a MULTIPOLYGON geometry, creating separate features for each polygon part.

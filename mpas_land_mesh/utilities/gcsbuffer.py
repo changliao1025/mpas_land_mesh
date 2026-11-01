@@ -12,6 +12,7 @@ except Exception:  # pragma: no cover - environment-dependent
 
 from mpas_land_mesh.utilities.constants import earth_radius
 
+
 def meters_to_degrees(distance_meters, latitude=0.0):
     """
     Convert meters to approximate degrees at given latitude
@@ -31,7 +32,7 @@ def meters_to_degrees(distance_meters, latitude=0.0):
 
     # 1 degree latitude = ~111,320 meters (constant)
 
-    #use earth_radius instead of 111320 to be more accurate
+    # use earth_radius instead of 111320 to be more accurate
     meters_per_degree = 2 * math.pi * earth_radius / 360.0
 
     degrees_lat = distance_meters / meters_per_degree
@@ -39,7 +40,9 @@ def meters_to_degrees(distance_meters, latitude=0.0):
     # For longitude, adjust by latitude
     # 1 degree longitude = meters_per_degree * cos(latitude) meters
     if latitude != 0.0:
-        degrees_lon = distance_meters / (meters_per_degree * math.cos(math.radians(latitude)))
+        degrees_lon = distance_meters / (
+            meters_per_degree * math.cos(math.radians(latitude))
+        )
         # Return average for buffer (which expands in all directions)
         return (degrees_lat + degrees_lon) / 2.0
 
@@ -94,6 +97,7 @@ def create_wkt_buffer_distance(wkt, distance_meter, epsg=4326, reference_latitud
     buffered = geometry.Buffer(distance_degrees)
     return buffered.ExportToWkt()
 
+
 def create_file_buffer_degrees(input_file, output_file, distance_degrees):
     """
     Create buffer around all features in a file using simple planar method
@@ -135,12 +139,12 @@ def create_file_buffer_degrees(input_file, output_file, distance_degrees):
         output_geom_type = ogr.wkbPolygon
 
     # Create output
-    pDriver = ogr.GetDriverByName('GeoJSON')
+    pDriver = ogr.GetDriverByName("GeoJSON")
     if os.path.exists(output_file):
         pDriver.DeleteDataSource(output_file)
 
     pDataset_out = pDriver.CreateDataSource(output_file)
-    pLayer_out = pDataset_out.CreateLayer('buffered', pSpatialRef, output_geom_type)
+    pLayer_out = pDataset_out.CreateLayer("buffered", pSpatialRef, output_geom_type)
 
     # Copy field definitions
     pLayerDefn_in = pLayer_in.GetLayerDefn()
@@ -164,8 +168,7 @@ def create_file_buffer_degrees(input_file, output_file, distance_degrees):
         # Copy attributes
         for i in range(pLayerDefn_in.GetFieldCount()):
             pFeature_out.SetField(
-                pLayerDefn_in.GetFieldDefn(i).GetName(),
-                pFeature_in.GetField(i)
+                pLayerDefn_in.GetFieldDefn(i).GetName(), pFeature_in.GetField(i)
             )
 
         pLayer_out.CreateFeature(pFeature_out)
@@ -178,8 +181,13 @@ def create_file_buffer_degrees(input_file, output_file, distance_degrees):
     print(f"  Buffer distance: {distance_degrees} degrees")
 
 
-def create_buffer_with_meter_distance(input_file, output_file, distance_meters,
-                                      reference_latitude=0.0):
+# Alias for backward compatibility
+create_simple_buffer_from_file = create_file_buffer_degrees
+
+
+def create_buffer_with_meter_distance(
+    input_file, output_file, distance_meters, reference_latitude=0.0
+):
     """
     Create buffer using distance in meters (converted to degrees)
 
@@ -198,6 +206,4 @@ def create_buffer_with_meter_distance(input_file, output_file, distance_meters,
     print(f"Converting {distance_meters} meters to ~{distance_degrees:.6f} degrees")
     print(f"  (at latitude {reference_latitude}°)")
 
-    create_simple_buffer_from_file(input_file, output_file, distance_degrees)
-
-
+    create_file_buffer_degrees(input_file, output_file, distance_degrees)

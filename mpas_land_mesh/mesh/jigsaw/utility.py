@@ -1,5 +1,5 @@
-import numpy as np
 import jigsawpy
+import numpy as np
 
 from mpas_land_mesh.mesh.jigsaw.inpoly2 import inpoly2
 

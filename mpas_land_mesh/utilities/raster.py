@@ -5,8 +5,11 @@ Minimal implementations for raster operations
 """
 
 import os
+from typing import Optional
+
 import numpy as np
 
+_GDAL_IMPORT_ERROR: Optional[Exception] = None
 try:
     from osgeo import gdal, ogr, osr
 except Exception as exc:  # pragma: no cover - environment-dependent
@@ -14,13 +17,16 @@ except Exception as exc:  # pragma: no cover - environment-dependent
     ogr = None
     osr = None
     _GDAL_IMPORT_ERROR = exc
-else:
-    _GDAL_IMPORT_ERROR = None
 
 
-def convert_vector_to_global_raster(sFilename_vector_in, sFilename_raster_out,
-                                     dResolution_x_in, dResolution_y_in,
-                                     iFlag_boundary_only_in=1, dFill_value_in=1):
+def convert_vector_to_global_raster(
+    sFilename_vector_in,
+    sFilename_raster_out,
+    dResolution_x_in,
+    dResolution_y_in,
+    iFlag_boundary_only_in=1,
+    dFill_value_in=1,
+):
     """
     Convert vector file to global raster
 
@@ -42,12 +48,13 @@ def convert_vector_to_global_raster(sFilename_vector_in, sFilename_raster_out,
     nrow = int((dLatitude_max - dLatitude_min) / dResolution_y_in)
 
     # Create output raster
-    pDriver = gdal.GetDriverByName('GTiff')
+    pDriver = gdal.GetDriverByName("GTiff")
     pDataset_out = pDriver.Create(sFilename_raster_out, ncolumn, nrow, 1, gdal.GDT_Byte)
 
     # Set geotransform
-    pDataset_out.SetGeoTransform([dLongitude_min, dResolution_x_in, 0,
-                                   dLatitude_max, 0, -dResolution_y_in])
+    pDataset_out.SetGeoTransform(
+        [dLongitude_min, dResolution_x_in, 0, dLatitude_max, 0, -dResolution_y_in]
+    )
 
     # Set projection
     pSpatialRef = osr.SpatialReference()
@@ -66,21 +73,25 @@ def convert_vector_to_global_raster(sFilename_vector_in, sFilename_raster_out,
     # Rasterize
     if iFlag_boundary_only_in == 1:
         # Boundary only
-        gdal.RasterizeLayer(pDataset_out, [1], pLayer,
-                           burn_values=[dFill_value_in],
-                           options=['ALL_TOUCHED=TRUE'])
+        gdal.RasterizeLayer(
+            pDataset_out,
+            [1],
+            pLayer,
+            burn_values=[dFill_value_in],
+            options=["ALL_TOUCHED=TRUE"],
+        )
     else:
         # Filled polygon
-        gdal.RasterizeLayer(pDataset_out, [1], pLayer,
-                           burn_values=[dFill_value_in])
+        gdal.RasterizeLayer(pDataset_out, [1], pLayer, burn_values=[dFill_value_in])
 
     pBand.FlushCache()
     pDataset_out = None
     pDataset_vector = None
 
 
-def create_raster_buffer_zone(sFilename_raster_in, sFilename_raster_out,
-                               iBuffer_value_in, iFill_value_in):
+def create_raster_buffer_zone(
+    sFilename_raster_in, sFilename_raster_out, iBuffer_value_in, iFill_value_in
+):
     """
     Create buffer zone around non-zero pixels in raster
 
@@ -100,10 +111,11 @@ def create_raster_buffer_zone(sFilename_raster_in, sFilename_raster_out,
     aData_out = np.copy(aData_in)
 
     # Find pixels with fill value
-    mask = (aData_in == iFill_value_in)
+    mask = aData_in == iFill_value_in
 
     # Create buffer by expanding mask
     from scipy import ndimage
+
     struct = ndimage.generate_binary_structure(2, 1)  # 4-connectivity
     buffered = ndimage.binary_dilation(mask, structure=struct, iterations=1)
 
@@ -112,7 +124,7 @@ def create_raster_buffer_zone(sFilename_raster_in, sFilename_raster_out,
     aData_out[buffer_mask] = iBuffer_value_in
 
     # Create output raster
-    pDriver = gdal.GetDriverByName('GTiff')
+    pDriver = gdal.GetDriverByName("GTiff")
     pDataset_out = pDriver.Create(sFilename_raster_out, ncolumn, nrow, 1, gdal.GDT_Byte)
 
     pDataset_out.SetGeoTransform(pDataset_in.GetGeoTransform())
@@ -127,9 +139,13 @@ def create_raster_buffer_zone(sFilename_raster_in, sFilename_raster_out,
     pDataset_in = None
 
 
-def fix_raster_antimeridian_issue(sFilename_raster_in, sFilename_raster_out,
-                                   iBuffer_value_in, iFill_value_in,
-                                   iRaster_buffer_pixel=2):
+def fix_raster_antimeridian_issue(
+    sFilename_raster_in,
+    sFilename_raster_out,
+    iBuffer_value_in,
+    iFill_value_in,
+    iRaster_buffer_pixel=2,
+):
     """
     Fix antimeridian discontinuity issues in global rasters
 
@@ -164,7 +180,7 @@ def fix_raster_antimeridian_issue(sFilename_raster_in, sFilename_raster_out,
             aData[i, -iRaster_buffer_pixel:] = iBuffer_value_in
 
     # Create output
-    pDriver = gdal.GetDriverByName('GTiff')
+    pDriver = gdal.GetDriverByName("GTiff")
     pDataset_out = pDriver.Create(sFilename_raster_out, ncolumn, nrow, 1, gdal.GDT_Byte)
 
     pDataset_out.SetGeoTransform(pDataset_in.GetGeoTransform())
@@ -208,10 +224,10 @@ def gdal_read_geotiff_file(sFilename_in):
     aData = pBand.ReadAsArray()
 
     gt = pDataset.GetGeoTransform()
-    originX = gt[0]       # X coordinate of upper-left corner
-    originY = gt[3]       # Y coordinate of upper-left corner
-    pixelWidth = gt[1]    # Pixel width (positive)
-    pixelHeight = gt[5]   # Pixel height (negative for north-up)
+    originX = gt[0]  # X coordinate of upper-left corner
+    originY = gt[3]  # Y coordinate of upper-left corner
+    pixelWidth = gt[1]  # Pixel width (positive)
+    pixelHeight = gt[5]  # Pixel height (negative for north-up)
 
     nodata = pBand.GetNoDataValue()
     missingValue = nodata if nodata is not None else -9999
@@ -222,13 +238,13 @@ def gdal_read_geotiff_file(sFilename_in):
     pDataset = None  # close
 
     return {
-        'dataOut': aData,
-        'originX': originX,
-        'originY': originY,
-        'pixelWidth': pixelWidth,
-        'pixelHeight': pixelHeight,
-        'missingValue': missingValue,
-        'nrow': nrow,
-        'ncolumn': ncolumn,
-        'projection': projection,
+        "dataOut": aData,
+        "originX": originX,
+        "originY": originY,
+        "pixelWidth": pixelWidth,
+        "pixelHeight": pixelHeight,
+        "missingValue": missingValue,
+        "nrow": nrow,
+        "ncolumn": ncolumn,
+        "projection": projection,
     }

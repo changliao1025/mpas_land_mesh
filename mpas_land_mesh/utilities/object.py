@@ -6,9 +6,9 @@ to remove external pyflowline dependencies. Uses rtree spatial indexing when
 available, with a pure-Python fallback.
 """
 
+import logging
 
 import numpy as np
-import logging
 
 try:
     from rtree.index import Index as RTreeindex
@@ -23,6 +23,7 @@ from mpas_land_mesh.utilities.spatial_reference import reproject_coordinates
 
 # Configure logger for this module
 logger = logging.getLogger(__name__)
+
 
 def find_vertex_on_edge(aVertex_in, pEdge_in):
     """
@@ -58,7 +59,6 @@ def find_vertex_on_edge(aVertex_in, pEdge_in):
     x2 = pVertex_end.dLongitude_degree
     y2 = pVertex_end.dLatitude_degree
 
-
     # Use R-tree spatial index for efficient lookup
     index_vertex = RTreeindex()
     for i in range(nVertex):
@@ -80,7 +80,6 @@ def find_vertex_on_edge(aVertex_in, pEdge_in):
             aDistance.append(dDistance)
             aIndex.append(k)
             npoint += 1
-
 
     # Re-order by distance from edge start
     if iFlag_exist == 1:
@@ -304,8 +303,8 @@ def convert_gcs_coordinates_to_flowline(aCoordinates_in):
     Returns:
         _type_: _description_
     """
-    from pyearthmesh.classes.vertex import pyvertex
     from pyearthmesh.classes.edge import pyedge
+    from pyearthmesh.classes.vertex import pyvertex
     from pyearthriver.classes.flowline import pyflowline
 
     npoint = len(aCoordinates_in)
@@ -326,8 +325,8 @@ def convert_gcs_coordinates_to_flowline(aCoordinates_in):
 
 
 def convert_pcs_coordinates_to_flowline(aCoordinates_in, pProjection_in):
-    from pyearthmesh.classes.vertex import pyvertex
     from pyearthmesh.classes.edge import pyedge
+    from pyearthmesh.classes.vertex import pyvertex
     from pyearthriver.classes.flowline import pyflowline
 
     npoint = len(aCoordinates_in)

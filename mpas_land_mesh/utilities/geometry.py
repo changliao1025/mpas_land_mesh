@@ -1,10 +1,10 @@
-
 import math
-from typing import Union, Tuple, List, Optional
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
 
 try:
-    from osgeo import osr, gdal, ogr
+    from osgeo import gdal, ogr, osr
 except Exception:  # pragma: no cover - environment-dependent
     osr = None
     gdal = None
@@ -13,7 +13,8 @@ except Exception:  # pragma: no cover - environment-dependent
 # import NDArray
 from numpy.typing import NDArray
 
-from mpas_land_mesh.utilities.constants import earth_radius, IDL_TOLERANCE, IDL_OFFSET
+from mpas_land_mesh.utilities.constants import IDL_OFFSET, IDL_TOLERANCE, earth_radius
+
 
 def calculate_angle_between_point(
     dLongitude1_in: float,
@@ -42,7 +43,7 @@ def calculate_angle_between_point(
     """
 
     # Determine whether the downstream conversion routine should treat inputs as radians.
-    iFlag_convert_radian = True if iFlag_radian else None
+    iFlag_convert_radian = bool(iFlag_radian)
 
     # The points in 3D space
     a3 = convert_longitude_latitude_to_sphere_3d(
@@ -91,7 +92,7 @@ def calculate_distance_based_on_longitude_latitude(
     aLongitude_to: Union[float, list, np.ndarray],
     aLatitude_to: Union[float, list, np.ndarray],
     bUnits_are_radians: bool = False,
-    dRadius_in: float = None,
+    dRadius_in: Optional[float] = None,
 ) -> Union[float, np.ndarray]:
     """
     Calculate the great circle distances between arrays of points
@@ -579,6 +580,7 @@ def find_great_circle_intersection_with_meridian(
 
     return (target_lon, float(lat_deg))
 
+
 def convert_longitude_latitude_to_sphere_3d(
     dLongitude_in: float, dLatitude_in: float, iFlag_radian: bool = False
 ) -> np.ndarray:
@@ -869,6 +871,7 @@ def convert_sphere_3d_to_longitude_latitude(
 
 def find_minimal_enclosing_polygon(aLongitude_degree, aLatitude_degree):
     from scipy.spatial import ConvexHull
+
     # Convert aLatitude_degree/aLongitude_degree points to Cartesian coordinates
     aVertex_cartesian = list()
     for i in range(len(aLongitude_degree)):
@@ -1028,7 +1031,7 @@ def calculate_spherical_triangle_area(
         aLatitude_radian[0],
         aLongitude_radian[1],
         aLatitude_radian[1],
-        iFlag_radian=True,
+        bUnits_are_radians=True,
     )
 
     # Edge b: from point 1 to point 2
@@ -1037,7 +1040,7 @@ def calculate_spherical_triangle_area(
         aLatitude_radian[1],
         aLongitude_radian[2],
         aLatitude_radian[2],
-        iFlag_radian=True,
+        bUnits_are_radians=True,
     )
 
     # Edge c: from point 2 to point 0
@@ -1046,7 +1049,7 @@ def calculate_spherical_triangle_area(
         aLatitude_radian[2],
         aLongitude_radian[0],
         aLatitude_radian[0],
-        iFlag_radian=True,
+        bUnits_are_radians=True,
     )
 
     # Check for degenerate triangle (collinear points)
@@ -1454,12 +1457,12 @@ def calculate_polygon_file_area(sFilename_polygon_in: str) -> float:
         sGeometryType = pGeometry.GetGeometryName()
 
         if sGeometryType == "POLYGON":
-            aCoords_gcs = get_geometry_coordinates(pGeometry)
+            aCoords_gcs = np.asarray(get_geometry_coordinates(pGeometry))
             dArea += calculate_polygon_area(aCoords_gcs[:, 0], aCoords_gcs[:, 1])
         elif sGeometryType == "MULTIPOLYGON":
             for i in range(pGeometry.GetGeometryCount()):
                 pGeometry_temp = pGeometry.GetGeometryRef(i)
-                aCoords_gcs = get_geometry_coordinates(pGeometry_temp)
+                aCoords_gcs = np.asarray(get_geometry_coordinates(pGeometry_temp))
                 dArea += calculate_polygon_area(aCoords_gcs[:, 0], aCoords_gcs[:, 1])
         # Skip unsupported geometry types
 
@@ -1674,7 +1677,6 @@ def split_international_date_line_polygon_coordinates(aCoords_gcs):
     return result
 
 
-
 def calculate_signed_area_shoelace(coords: np.ndarray) -> float:
     x, y = coords[:, 0], coords[:, 1]
 
@@ -1686,11 +1688,13 @@ def calculate_signed_area_shoelace(coords: np.ndarray) -> float:
     signed_area = 0.5 * np.sum(x * y_rolled - x_rolled * y)
     return signed_area
 
+
 def remove_duplicate_closure(coords: NDArray[np.floating]) -> NDArray[np.floating]:
     """Remove duplicated closing vertex when first and last are equal."""
     if len(coords) > 1 and np.allclose(coords[0], coords[-1], atol=1.0e-12):
         return coords[:-1]
     return coords
+
 
 def calculate_signed_area_spherical_polar(
     coords: np.ndarray, pole: str = "north"
@@ -1786,6 +1790,7 @@ def _point_on_segment_2d(
 
     return True
 
+
 def _point_in_polygon_2d(
     point: NDArray[np.floating],
     polygon: NDArray[np.floating],
@@ -1818,6 +1823,7 @@ def _point_in_polygon_2d(
                 inside = not inside
 
     return inside
+
 
 def polygon_includes_pole(
     coords: NDArray[np.floating],
@@ -1859,6 +1865,7 @@ def polygon_includes_pole(
     return _point_in_polygon_2d(
         origin, projected, include_boundary=include_boundary, tol=tol
     )
+
 
 def unwrap_longitudes(coords: np.ndarray) -> np.ndarray:
     """Unwrap longitude coordinates to handle International Date Line crossings.
@@ -1902,7 +1909,6 @@ def unwrap_longitudes(coords: np.ndarray) -> np.ndarray:
     lons[diff < -180] += 360
 
     return coords_unwrapped
-
 
 
 def check_cross_international_date_line_polygon(
@@ -2032,7 +2038,9 @@ def check_cross_international_date_line_polygon(
 
                 # Count non-IDL neighbors to determine preferred hemisphere
                 neighbor_lons = []
-                if abs(abs(prev_lon) - 180.0) > IDL_TOLERANCE:  # Previous vertex not on IDL
+                if (
+                    abs(abs(prev_lon) - 180.0) > IDL_TOLERANCE
+                ):  # Previous vertex not on IDL
                     neighbor_lons.append(prev_lon)
                 if abs(abs(next_lon) - 180.0) > IDL_TOLERANCE:  # Next vertex not on IDL
                     neighbor_lons.append(next_lon)
@@ -2110,8 +2118,9 @@ def check_counter_clockwise(coords: np.ndarray) -> bool:
             signed_area = calculate_signed_area_shoelace(coords)
     return signed_area > 0
 
+
 def get_geometry_coordinates(
-    geometry: 'ogr.Geometry',
+    geometry: "ogr.Geometry",
     enforce_ccw: bool = False,
 ) -> Union[np.ndarray, List[np.ndarray]]:
     """Extract coordinates from an OGR geometry object.
@@ -2199,7 +2208,7 @@ def get_geometry_coordinates(
 
 
 def get_polygon_exterior_coords(
-    polygon_geometry: 'ogr.Geometry', enforce_ccw: bool = False
+    polygon_geometry: "ogr.Geometry", enforce_ccw: bool = False
 ) -> np.ndarray:
     """Extract exterior ring coordinates from a polygon.
 
@@ -2278,7 +2287,7 @@ def get_polygon_exterior_coords(
 
 
 def get_multipolygon_exterior_coords(
-    multipolygon_geometry: 'ogr.Geometry',
+    multipolygon_geometry: "ogr.Geometry",
     enforce_ccw: bool = False,
 ) -> List[np.ndarray]:
     """Extract exterior ring coordinates from all parts of a multipolygon.
@@ -2388,7 +2397,7 @@ def get_multipolygon_exterior_coords(
     return exterior_coords_list
 
 
-def get_linestring_coords(linestring_geometry: 'ogr.Geometry') -> np.ndarray:
+def get_linestring_coords(linestring_geometry: "ogr.Geometry") -> np.ndarray:
     """Extract coordinates from a linestring geometry.
 
     Parameters
@@ -2438,7 +2447,7 @@ def get_linestring_coords(linestring_geometry: 'ogr.Geometry') -> np.ndarray:
     return np.array(coords)
 
 
-def get_point_coords(point_geometry: 'ogr.Geometry') -> np.ndarray:
+def get_point_coords(point_geometry: "ogr.Geometry") -> np.ndarray:
     """Extract coordinates from a point geometry.
 
     Parameters
@@ -2483,7 +2492,7 @@ def get_point_coords(point_geometry: 'ogr.Geometry') -> np.ndarray:
     return np.array([(point[0], point[1])])
 
 
-def get_linearring_coords(linearring_geometry: 'ogr.Geometry') -> np.ndarray:
+def get_linearring_coords(linearring_geometry: "ogr.Geometry") -> np.ndarray:
     """Extract coordinates from a linear ring geometry.
 
     Parameters

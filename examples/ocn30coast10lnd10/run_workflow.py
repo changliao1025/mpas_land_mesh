@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Global 30km Ocean, 10km Coastline, 10km Land MPAS Mesh Workflow (config-driven).
 
@@ -53,7 +52,9 @@ def main() -> None:
         oWorkflow.create_hpc_job()
         print(f"   * run_mpas.py  written to: {oWorkflow.output_workspace}")
         print(f"   * submit.job   written to: {oWorkflow.output_workspace}")
-        print(f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}")
+        print(
+            f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}"
+        )
     else:
         print("\nStep 3 (local): Setting up MPAS workspace...")
         oWorkflow.setup()

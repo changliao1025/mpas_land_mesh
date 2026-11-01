@@ -1,18 +1,19 @@
-import os
-from pathlib import Path
-import shutil
-import math
 import copy
+import math
+import os
+import shutil
 import time
+from pathlib import Path
+
+import jigsawpy
+import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 import numpy as np
 from osgeo import gdal
-import jigsawpy
-from mpas_land_mesh.utilities.raster import gdal_read_geotiff_file
 
-import mpas_tools.mesh.creation.mesh_definition_tools as mdt
 from mpas_land_mesh.mesh.jigsaw.inpoly2 import inpoly2
 from mpas_land_mesh.mesh.jigsaw.loadgeo import loadgeo
-from mpas_land_mesh.mesh.jigsaw.utility import addpoint, addline, addpoly, innerto
+from mpas_land_mesh.mesh.jigsaw.utility import addline, addpoint, addpoly, innerto
+from mpas_land_mesh.utilities.raster import gdal_read_geotiff_file
 
 
 def compute_mask(
@@ -105,7 +106,7 @@ def run_jigsaw(
     and mesh configuration information.
 
     The boolean flags MAKE-BOOL control whether mesh
-    information is built from scratch, or if an exitsing an
+    information is built from scratch, or if an
     existing file is to be used. For example, setting
     MAKE-BOOL.SPAC = FALSE relies on an existing spacing
     pattern be available in MESH-PATH/tmp/.
@@ -326,9 +327,7 @@ def run_jigsaw(
             dResolution_river_network = 6.0
 
         if "dResolution_river_outlet" in aConfig_in:
-            dResolution_river_outlet = float(
-                aConfig_in["dResolution_river_outlet"]
-            )
+            dResolution_river_outlet = float(aConfig_in["dResolution_river_outlet"])
         else:
             dResolution_river_outlet = 12.0
 
@@ -663,7 +662,7 @@ def run_jigsaw(
                         )
                         spac.value[aOcean_mask] = aOcean_value[aOcean_mask]
                     else:
-                        #use the same resolution for the ocean everywhere
+                        # use the same resolution for the ocean everywhere
                         aOcean_mask = compute_mask(
                             aLand_ocean_mask,
                             missingValue,
@@ -685,19 +684,18 @@ def run_jigsaw(
         if iFlag_spac_coastline:
             print("Compute global h(x)... for coastline")
             if iFlag_RRS18to6_ocean:
-                #this is a special case when we have RRS18to6 for ocean, we want to set the coastline to the same as ocean so ocean stability is ensured
+                # this is a special case when we have RRS18to6 for ocean, we want to set the coastline to the same as ocean so ocean stability is ensured
                 vals = mdt.RRS_CellWidthVsLat(
-                        spac.ygrid * 180.0 / np.pi, cellWidthEq=18.0, cellWidthPole=6.0
-                    )
+                    spac.ygrid * 180.0 / np.pi, cellWidthEq=18.0, cellWidthPole=6.0
+                )
                 vals = np.flipud(vals)  # Add this line to reverse the order
                 vals = np.reshape(vals, (spac.ygrid.size, 1))
                 aCoastal_value = np.array(
                     np.tile(vals, (1, spac.xgrid.size)), dtype=spac.REALS_t
                 )
-                spac.value[aCoastline_mask] =  aCoastal_value[aCoastline_mask]
+                spac.value[aCoastline_mask] = aCoastal_value[aCoastline_mask]
             else:
                 spac.value[aCoastline_mask] = dResolution_coastline
-
 
         if iFlag_spac_land:  # land feature, maybe mountain, etc
             print("Compute global h(x)... for land")
@@ -770,19 +768,19 @@ def run_jigsaw(
             print("Compute global h(x)... for river network")
             spac.value[aRiver_network_mask] = dResolution_river_network
             if iFlag_RRS18to6_ocean:
-                #the river outlet spacing will the same as the coastline spacing
-                #more improvement can be made here
+                # the river outlet spacing will the same as the coastline spacing
+                # more improvement can be made here
                 vals = mdt.RRS_CellWidthVsLat(
-                        spac.ygrid * 180.0 / np.pi, cellWidthEq=18.0, cellWidthPole=6.0
-                    )
+                    spac.ygrid * 180.0 / np.pi, cellWidthEq=18.0, cellWidthPole=6.0
+                )
                 vals = np.flipud(vals)  # Add this line to reverse the order
                 vals = np.reshape(vals, (spac.ygrid.size, 1))
                 aRiver_outlet_value = np.array(
                     np.tile(vals, (1, spac.xgrid.size)), dtype=spac.REALS_t
                 )
-                #river outlet mask
+                # river outlet mask
                 sFilename_river_network_raster = aConfig_in[
-                "sFilename_river_network_raster"
+                    "sFilename_river_network_raster"
                 ]
                 if not os.path.exists(sFilename_river_network_raster):
                     pass
@@ -804,7 +802,7 @@ def run_jigsaw(
                     ncolumn_space,
                     nrow_space,
                 )
-                spac.value[aRiver_outlet_mask] =  aRiver_outlet_value[aRiver_outlet_mask]
+                spac.value[aRiver_outlet_mask] = aRiver_outlet_value[aRiver_outlet_mask]
                 pass
             pass
         else:

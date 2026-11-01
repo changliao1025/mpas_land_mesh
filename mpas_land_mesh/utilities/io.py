@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 try:
     from osgeo import ogr, osr
@@ -50,13 +50,9 @@ def export_vertex_to_geojson(
     pLayer_json = pDataset_json.CreateLayer(
         "vertex", pSpatial_reference_in, ogr.wkbPoint
     )
-    pLayer_json.CreateField(
-        ogr.FieldDefn("pointid", ogr.OFTInteger64)
-    )
+    pLayer_json.CreateField(ogr.FieldDefn("pointid", ogr.OFTInteger64))
     if iFlag_attribute == 1:
-        pLayer_json.CreateField(
-            ogr.FieldDefn("connectivity", ogr.OFTInteger64)
-        )
+        pLayer_json.CreateField(ogr.FieldDefn("connectivity", ogr.OFTInteger64))
 
     pLayerDefn = pLayer_json.GetLayerDefn()
     pFeature_out = ogr.Feature(pLayerDefn)
@@ -81,6 +77,7 @@ def export_vertex_to_geojson(
     pDataset_json = pLayer_json = pFeature_out = None
 
     return
+
 
 def export_flowline_to_geojson(
     aFlowline_in,
@@ -184,6 +181,7 @@ def export_flowline_to_geojson(
 
     return
 
+
 def export_flowline_info_to_json(
     aCell, aCell_intersect_in, aFlowline_in, sFilename_json_out
 ):
@@ -216,5 +214,3 @@ def export_flowline_info_to_json(
         f.close()
 
     return
-
-

@@ -24,14 +24,13 @@ from pyearthmesh.config.config_manager import (
     dump_workflow_config,
     load_workflow_config,
 )
-from mpas_land_mesh.utilities import (
-    DEFAULT_CONFIG as UTILS_DEFAULT_CONFIG,
-    compile_workflow as utils_compile_workflow,
-    create_workflow as utils_create_workflow,
-    dump_workflow_config as utils_dump_workflow_config,
-    load_workflow_config as utils_load_workflow_config,
-)
 from pyearthmesh.config.workflows.mpas_workflow import MPASWorkflow
+
+from mpas_land_mesh.utilities import DEFAULT_CONFIG as UTILS_DEFAULT_CONFIG
+from mpas_land_mesh.utilities import compile_workflow as utils_compile_workflow
+from mpas_land_mesh.utilities import create_workflow as utils_create_workflow
+from mpas_land_mesh.utilities import dump_workflow_config as utils_dump_workflow_config
+from mpas_land_mesh.utilities import load_workflow_config as utils_load_workflow_config
 
 
 class TestWorkflowConfig(unittest.TestCase):
@@ -248,7 +247,9 @@ jigsaw:
         case_dir = self.base_dir / "test_case"
         case_dir.mkdir()
         yaml_file = case_dir / "workflow_config.yaml"
-        yaml_file.write_text("workflow:\n  mesh_type: mpas\n  case_index: 9\n", encoding="utf-8")
+        yaml_file.write_text(
+            "workflow:\n  mesh_type: mpas\n  case_index: 9\n", encoding="utf-8"
+        )
 
         # Pass directory directly
         cfg_from_dir = load_workflow_config(case_dir)
@@ -320,12 +321,16 @@ jigsaw:
             for k in compiled_yaml:
                 if k == "sFilename_model_configuration":
                     continue
-                self.assertIn(k, compiled_json, f"Key {k} missing in JSON compiled output for {example_dir.name}")
+                self.assertIn(
+                    k,
+                    compiled_json,
+                    f"Key {k} missing in JSON compiled output for {example_dir.name}",
+                )
                 self.assertEqual(
                     compiled_yaml[k],
                     compiled_json[k],
                     f"Value mismatch for key '{k}' in {example_dir.name}: "
-                    f"{compiled_yaml[k]} (YAML) != {compiled_json[k]} (JSON)"
+                    f"{compiled_yaml[k]} (YAML) != {compiled_json[k]} (JSON)",
                 )
 
 

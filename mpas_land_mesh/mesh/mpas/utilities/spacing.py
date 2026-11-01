@@ -1,7 +1,6 @@
-import numpy as np
-from scipy import spatial
-from scipy import interpolate
 import jigsawpy
+import numpy as np
+from scipy import interpolate, spatial
 
 from mpas_land_mesh.mesh.jigsaw.utility import zipmesh
 

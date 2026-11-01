@@ -6,10 +6,9 @@ mesh type (iMesh_type == 4), adapted from pyflowline without external dependenci
 """
 
 import numpy as np
-
-from pyearthmesh.classes.vertex import pyvertex
 from pyearthmesh.classes.edge import pyedge
 from pyearthmesh.classes.mpas import pympas
+from pyearthmesh.classes.vertex import pyvertex
 
 
 def convert_gcs_attributes_to_cell(
@@ -72,7 +71,7 @@ def convert_gcs_attributes_to_cell(
         pVertex1_dict = {
             "dLongitude_degree": float(aCoordinates_gcs_in[idx, 0]),
             "dLatitude_degree": float(aCoordinates_gcs_in[idx, 1]),
-            }
+        }
         pVertex_start = pyvertex(pVertex1_dict)
         pVertex_start.lVertexID = int(aVertexID_dummy[0])
 

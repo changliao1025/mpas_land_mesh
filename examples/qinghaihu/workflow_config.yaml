@@ -8,22 +8,22 @@
 
 # High-level workflow orchestration and execution targets
 workflow:
-  date: "20261101"                                # Run date (YYYYMMDD)
+  date: "20260801"                                # Run date (YYYYMMDD)
   mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
-  case_index: 1                                   # Case index number
+  case_index: 3                                   # Case index number
   model: jigsaw                                   # Core mesh generation backend
-  simplify_hydrosheds_river_network: true        # Optional line simplification for rivers
-  process_coastline: true                        # Coastline masking and buffering
+  simplify_hydrosheds_river_network: false        # Optional line simplification for rivers
+  process_coastline: false                        # Coastline masking and buffering
   debug: true                                     # Enable diagnostic logging
-  largest_outlets: 1                             # Retain top N largest basin outlets
+  largest_outlets: 10                            # Retain top N largest basin outlets
   run_on_hpc: false                               # Set true to generate SLURM batch job scripts
 
 # Multi-scale target cell resolutions (in kilometers)
 resolutions:
   ocean_km: 100                                   # Coarse open ocean resolution (100 km)
-  land_km: 8.0                                   # Background land resolution (12.5 km)
-  river_network_km: 3                             # River network corridor refinement (5 km)
-  coastline_km: 3                                # Near-shore transition resolution (10 km)
+  land_km: 12.5                                   # Background land resolution (12.5 km)
+  river_network_km: 5                             # River network corridor refinement (5 km)
+  coastline_km: 10                                # Near-shore transition resolution (10 km)
   lake_boundary_km: 3                             # Lake perimeter refinement (3 km)
   watershed_boundary_km: 3                        # Watershed divide refinement (3 km)
 
@@ -82,7 +82,7 @@ paths:
 jigsaw:
   standalone: true                                # Run standalone generator without external wrapper
   create_directory: true                          # Auto-create case subfolder in workspace
-  hours: 10                                        # SLURM walltime allocation (hours)
+  hours: 3                                        # SLURM walltime allocation (hours)
   slurm: cpu_single                               # SLURM partition or queue name
   ncolumn_space: 3600                             # Spacing raster longitudinal grid cells (0.1 deg)
   nrow_space: 1800                                # Spacing raster latitudinal grid cells (0.1 deg)
@@ -92,7 +92,7 @@ jigsaw:
   iFlag_spac_land: true                           # Apply land spacing constraint
   iFlag_geom_river_network: true                  # Enforce river network feature constraints
   iFlag_spac_river_network: true                  # Enforce river network resolution refinement
-  iFlag_geom_lake_boundary: false                  # Enforce lake boundary feature constraints
-  iFlag_spac_lake_boundary: false                  # Enforce lake boundary resolution refinement
+  iFlag_geom_lake_boundary: true                   # Enforce lake boundary feature constraints
+  iFlag_spac_lake_boundary: true                   # Enforce lake boundary resolution refinement
   iFlag_spac_watershed_boundary: true             # Refine watershed divide boundaries
   iFlag_spac_coastline: true                      # Refine coastline transition zone

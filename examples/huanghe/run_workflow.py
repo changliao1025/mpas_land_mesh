@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Yellow River (Huanghe) MPAS mesh workflow (config-driven workflow).
 
@@ -51,7 +50,9 @@ def main() -> None:
         oWorkflow.create_hpc_job()
         print(f"   * run_mpas.py  written to: {oWorkflow.output_workspace}")
         print(f"   * submit.job   written to: {oWorkflow.output_workspace}")
-        print(f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}")
+        print(
+            f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}"
+        )
     else:
         print("\nStep 3 (local): Setting up MPAS workspace...")
         oWorkflow.setup()

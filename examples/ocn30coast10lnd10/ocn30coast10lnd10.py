@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Backward-compatibility driver for ocn30coast10lnd10.
 
