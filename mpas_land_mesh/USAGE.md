@@ -17,7 +17,7 @@ from mpas_land_mesh.core import (
     create_config_template
 )
 
-from mpas_land_mesh.preprocessing import (
+from hexwatershed_utility.preprocess.feature.river import (
     get_outlet_location,
     simplify_river_network
 )
@@ -111,7 +111,7 @@ create_raster_buffer_zone(
 #### Get Outlet Location
 
 ```python
-from mpas_land_mesh.preprocessing.river_network import get_outlet_location
+from hexwatershed_utility.preprocess.feature.river import get_outlet_location
 
 longitude, latitude = get_outlet_location('river_network.geojson')
 print(f"Outlet at: {longitude}, {latitude}")
@@ -120,7 +120,7 @@ print(f"Outlet at: {longitude}, {latitude}")
 #### Simplify River Network
 
 ```python
-from mpas_land_mesh.preprocessing.river_network import simplify_river_network
+from hexwatershed_utility.preprocess.feature.river import simplify_river_network
 
 simplify_river_network(
     'HydroRIVERS.shp',
@@ -197,9 +197,9 @@ Then use the original workflow scripts in [`examples/global/`](../../examples/gl
 
 ### Preprocessing
 
-- [`river_network.py`](preprocessing/river_network.py) - River network processing
-- [`coastline.py`](preprocessing/coastline.py) - Coastline processing
-- [`watershed.py`](preprocessing/watershed.py) - Watershed processing
+Preprocessing is provided directly by `hexwatershed_utility`:
+- `hexwatershed_utility.preprocess.feature.river` - River network processing
+- `hexwatershed_utility.preprocess.feature.coastline` - Coastline and land-ocean mask processing
 
 ## Support
 

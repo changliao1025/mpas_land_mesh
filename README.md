@@ -33,8 +33,6 @@ mpas_land_mesh/
 ├── MIGRATION.md                    # Migration notes
 ├── requirements.txt                # Minimal dependencies
 ├── setup.py                        # Package setup
-├── preprocessing/                  # Preprocessing re-exports from hexwatershed_utility
-│   └── __init__.py
 └── utilities/                      # Domain-specific utilities
     ├── __init__.py
     ├── constants.py                # Physical and geometric constants
@@ -103,11 +101,11 @@ pip install pyearth pyearthriver pyearthmesh pyyaml
 ## Usage
 
 ```python
+from hexwatershed_utility.preprocess.feature.river import simplify_river_network
 from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
-from mpas_land_mesh.preprocessing import simplify_hydrorivers_networks
 
 # --- Step 1: Preprocess river network ---
-simplify_hydrorivers_networks(
+simplify_river_network(
     sFilename_flowline_hydroshed_in='HydroRIVERS_v10.shp',
     sFilename_flowline_hydroshed_out='river_simplified.geojson',
     dDistance_tolerance_in=10_000,       # metres
