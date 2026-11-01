@@ -45,6 +45,7 @@ setup(
         "pyearthmesh>=0.1.1",
         "pyearthriver>=0.1.0",
         "pyearthbuffer>=0.1.0",
+        "hexwatershed_utility>=0.1.0",
         "geographiclib>=2.0",
     ],
     extras_require={

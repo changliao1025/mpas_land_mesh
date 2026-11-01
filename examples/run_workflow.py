@@ -10,6 +10,7 @@ import logging
 # you can change this to your preferred output directory
 import os
 
+from hexwatershed_utility.preprocess.feature.river import simplify_river_network
 from pyearth.toolbox.conversion.convert_vector_to_global_raster import (
     convert_vector_to_global_raster,
 )
@@ -24,7 +25,6 @@ from mpas_land_mesh.preprocessing.coastline import (
     create_land_ocean_mask_from_naturalearth,
     fix_naturalearth_hydrosheds_incompatibility,
 )
-from mpas_land_mesh.preprocessing.river_network import simplify_hydrorivers_network
 from mpas_land_mesh.utilities.constants import (
     DRAINAGE_AREA_MULTIPLIER,
     ISLAND_AREA_MULTIPLIER,
@@ -158,7 +158,7 @@ sFilename_river_network_raster = os.path.join(
     sWorkspace_river_network_output, "river_network_raster.tif"
 )
 if iFlag_simplify_hydrosheds_river_network == 1:
-    simplify_hydrorivers_network(
+    simplify_river_network(
         sFilename_flowline_hydrosheds_in,
         sFilename_flowline_hydrosheds_out,
         dDistance_tolerance,

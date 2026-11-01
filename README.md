@@ -11,6 +11,7 @@ mpas_land_mesh (land-river mesh workflows)
   │     └── pyearth (foundational GIS, geometry, raster, vector, system)
   ├── pyearthbuffer (geodesic GCS buffer operations)
   ├── pyearthriver (river network topology, flowlines, rivergraphs)
+  ├── hexwatershed_utility (hydrological river network preprocessing & simplification)
   └── pyearth (shared GIS and scientific utilities)
 ```
 
@@ -18,6 +19,7 @@ mpas_land_mesh (land-river mesh workflows)
 - **`pyearthmesh`**: Unstructured (MPAS, JIGSAW) and structured mesh generation, workflow configuration schemas, and compilation.
 - **`pyearthriver`**: River network processing, flowline graphs, and hydrological features.
 - **`pyearthbuffer`**: Geodesic buffer calculations on the WGS84 ellipsoid for GCS vector data.
+- **`hexwatershed_utility`**: River network preprocessing, topology building, and line simplification.
 - **`mpas_land_mesh`**: High-level unified land-river mesh workflow execution, coastline/ocean masking, and basin/river network simplification.
 
 ## Structure
@@ -33,7 +35,6 @@ mpas_land_mesh/
 ├── setup.py                        # Package setup
 ├── preprocessing/                  # Data preprocessing
 │   ├── __init__.py
-│   ├── river_network.py            # River network processing
 │   └── coastline.py                # Coastline processing
 └── utilities/                      # Domain-specific utilities
     ├── __init__.py
@@ -54,6 +55,7 @@ Minimal required packages:
 - `pyearthmesh` — unstructured/structured mesh generation and workflow configuration
 - `pyearthriver` — river network structures and flowlines
 - `pyearthbuffer` — geodesic buffer calculations
+- `hexwatershed_utility` — river network preprocessing and simplification
 - `gdal` / `osgeo` — geospatial data processing
 - `numpy>=1.20.0` — array operations
 - `scipy>=1.7.0` — spatial operations
@@ -65,10 +67,11 @@ Minimal required packages:
 ### Mesh Statistics (`mpas_land_mesh.utilities`)
 - `get_mesh_stats()` — compute mesh cell count, resolution, and area metrics from MPAS NetCDF
 
-### River Network Processing (`mpas_land_mesh.preprocessing`)
-- `simplify_hydrorivers_networks()` — simplify HydroRIVERS networks by drainage area and distance tolerance
+### River Network Processing (`hexwatershed_utility.preprocess.feature.river`)
+- `simplify_river_network()` (aliased as `simplify_hydrorivers_network`) — simplify river networks by drainage area and distance tolerance
 - `tag_river_outlet()` — tag river outlets in a flowline dataset
 - `get_outlet_location()` — get outlet coordinates
+- `crop_river_network_by_boundary()` — crop flowlines to region boundary
 - `convert_geometry_flowline()` — convert OGR geometry to a flowline object
 - `precompute_flowline_geometries()` — precompute spatial bounds for flowlines
 - `precompute_flowline_geometries_by_segment()` — precompute bounds grouped by segment
@@ -139,6 +142,7 @@ See [`examples/run_minimal_workflow.py`](../examples/run_minimal_workflow.py) fo
 | `pyearth` | Foundational GIS, geometry, coordinate transforms, raster/vector operations |
 | `pyearthbuffer` | Geodesic buffer calculations on WGS84 for GCS vector data |
 | `pyearthriver` | Hydrological flowline data structures, river networks, vector exports |
+| `hexwatershed_utility` | Hydrological river network preprocessing, simplification, and outlet tagging |
 | `pyearthmesh` | Unstructured and structured mesh generation, JIGSAW wrapper, config schema |
 | `mpas_land_mesh` | Unified Land-River Mesh (ULRM) preprocessing, masking, workflow execution |
 

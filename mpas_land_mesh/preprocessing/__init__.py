@@ -1,37 +1,31 @@
 """
 Preprocessing utilities for river networks and coastlines.
-
-Note on import structure
-------------------------
-``coastlines.py`` imports ``pyearth`` and ``pyearthbuffer`` at module level.
-Those packages may not be installed in every environment, so the coastline
-symbols are imported inside a ``try/except`` block.  If the import fails the
-coastline functions are simply not available at the package level; import them
-directly when needed::
-
-    from mpas_land_mesh.preprocessing.coastlines import (
-        create_land_ocean_mask_from_naturalearth,
-        fix_naturalearth_hydrosheds_incompatibility,
-        ...
-    )
 """
 
-from .river_network import (
-    convert_geometry_flowline,
+from hexwatershed_utility.preprocess.feature.river import (
+    crop_river_network_by_boundary,
     get_outlet_location,
-    precompute_flowline_geometries,
-    precompute_flowline_geometries_by_segment,
-    simplify_hydrorivers_network,
+    simplify_river_network,
     tag_river_outlet,
 )
+from hexwatershed_utility.preprocess.feature.river.simplify_river_network import (
+    convert_geometry_flowline,
+    precompute_flowline_geometries,
+    precompute_flowline_geometries_by_segment,
+)
+
+# Alias for backward compatibility
+simplify_hydrorivers_network = simplify_river_network
 
 __all__ = [
-    # river_network
+    # river network (delegated to hexwatershed_utility)
     "convert_geometry_flowline",
+    "crop_river_network_by_boundary",
+    "get_outlet_location",
     "precompute_flowline_geometries",
     "precompute_flowline_geometries_by_segment",
     "simplify_hydrorivers_network",
-    "get_outlet_location",
+    "simplify_river_network",
     "tag_river_outlet",
 ]
 
