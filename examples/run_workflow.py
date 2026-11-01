@@ -10,6 +10,10 @@ import logging
 # you can change this to your preferred output directory
 import os
 
+from hexwatershed_utility.preprocess.feature.coastline import (
+    create_land_ocean_mask_from_naturalearth,
+    fix_naturalearth_hydrosheds_incompatibility,
+)
 from hexwatershed_utility.preprocess.feature.river import simplify_river_network
 from pyearth.toolbox.conversion.convert_vector_to_global_raster import (
     convert_vector_to_global_raster,
@@ -21,10 +25,6 @@ from pyearth.toolbox.management.vector.fields import (
 from pyearth.toolbox.management.vector.merge_features import merge_features
 from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
 
-from mpas_land_mesh.preprocessing.coastline import (
-    create_land_ocean_mask_from_naturalearth,
-    fix_naturalearth_hydrosheds_incompatibility,
-)
 from mpas_land_mesh.utilities.constants import (
     DRAINAGE_AREA_MULTIPLIER,
     ISLAND_AREA_MULTIPLIER,

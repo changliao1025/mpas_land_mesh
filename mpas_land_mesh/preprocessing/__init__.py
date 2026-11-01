@@ -2,6 +2,16 @@
 Preprocessing utilities for river networks and coastlines.
 """
 
+from hexwatershed_utility.preprocess.feature.coastline import (
+    create_land_ocean_mask,
+    create_land_ocean_mask_from_basins,
+    create_land_ocean_mask_from_naturalearth,
+    create_land_ocean_mask_from_shoreline,
+    extend_land_mask_to_rivers,
+    fix_naturalearth_hydrosheds_incompatibility,
+    geometries_bbox_overlap,
+    remove_internal_polygon,
+)
 from hexwatershed_utility.preprocess.feature.river import (
     crop_river_network_by_boundary,
     get_outlet_location,
@@ -27,21 +37,13 @@ __all__ = [
     "simplify_hydrorivers_network",
     "simplify_river_network",
     "tag_river_outlet",
+    # coastline (delegated to hexwatershed_utility)
+    "create_land_ocean_mask",
+    "create_land_ocean_mask_from_basins",
+    "create_land_ocean_mask_from_naturalearth",
+    "create_land_ocean_mask_from_shoreline",
+    "extend_land_mask_to_rivers",
+    "fix_naturalearth_hydrosheds_incompatibility",
+    "geometries_bbox_overlap",
+    "remove_internal_polygon",
 ]
-
-try:
-    from .coastline import (
-        create_land_ocean_mask,
-        create_land_ocean_mask_from_naturalearth,
-        fix_naturalearth_hydrosheds_incompatibility,
-        geometries_bbox_overlap,
-    )
-
-    __all__ += [
-        "create_land_ocean_mask",
-        "create_land_ocean_mask_from_naturalearth",
-        "geometries_bbox_overlap",
-        "fix_naturalearth_hydrosheds_incompatibility",
-    ]
-except ImportError:
-    pass

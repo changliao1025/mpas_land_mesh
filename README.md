@@ -33,9 +33,8 @@ mpas_land_mesh/
 ├── MIGRATION.md                    # Migration notes
 ├── requirements.txt                # Minimal dependencies
 ├── setup.py                        # Package setup
-├── preprocessing/                  # Data preprocessing
-│   ├── __init__.py
-│   └── coastline.py                # Coastline processing
+├── preprocessing/                  # Preprocessing re-exports from hexwatershed_utility
+│   └── __init__.py
 └── utilities/                      # Domain-specific utilities
     ├── __init__.py
     ├── constants.py                # Physical and geometric constants
@@ -76,11 +75,13 @@ Minimal required packages:
 - `precompute_flowline_geometries()` — precompute spatial bounds for flowlines
 - `precompute_flowline_geometries_by_segment()` — precompute bounds grouped by segment
 
-### Coastline Processing (`mpas_land_mesh.preprocessing`)
-- `create_land_ocean_mask()` — create a land/ocean mask
-- `create_land_ocean_mask_from_naturalearth()` — create mask from Natural Earth data
-- `fix_naturalearth_hydrosheds_incompatibility()` — reconcile Natural Earth and HydroSHEDS coastlines
+### Coastline & Mask Processing (`hexwatershed_utility.preprocess.feature.coastline`)
+- `create_land_ocean_mask()` / `create_land_ocean_mask_from_naturalearth()` — create land/ocean mask from Natural Earth data
+- `create_land_ocean_mask_from_shoreline()` — create land/ocean mask from custom shoreline vector
+- `create_land_ocean_mask_from_basins()` — create land/ocean mask from regional basin boundaries
+- `extend_land_mask_to_rivers()` (aliased as `fix_naturalearth_hydrosheds_incompatibility`) — reconcile land polygons and coastal flowlines
 - `geometries_bbox_overlap()` — test bounding-box overlap between geometries
+- `remove_internal_polygon()` — remove interior rings (lakes/holes) from land polygons
 
 ### Configuration & Workflow Management (`pyearthmesh.config.config_manager`)
 - `load_workflow_config()` — load single sectioned workflow YAML/JSON configuration
@@ -142,7 +143,7 @@ See [`examples/run_minimal_workflow.py`](../examples/run_minimal_workflow.py) fo
 | `pyearth` | Foundational GIS, geometry, coordinate transforms, raster/vector operations |
 | `pyearthbuffer` | Geodesic buffer calculations on WGS84 for GCS vector data |
 | `pyearthriver` | Hydrological flowline data structures, river networks, vector exports |
-| `hexwatershed_utility` | Hydrological river network preprocessing, simplification, and outlet tagging |
+| `hexwatershed_utility` | River network & coastline preprocessing, flowline simplification, land-ocean masking |
 | `pyearthmesh` | Unstructured and structured mesh generation, JIGSAW wrapper, config schema |
 | `mpas_land_mesh` | Unified Land-River Mesh (ULRM) preprocessing, masking, workflow execution |
 
