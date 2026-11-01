@@ -29,15 +29,17 @@ except Exception:  # pragma: no cover - environment-dependent
 
 from datetime import datetime
 
+from pyearth.gis.geometry import calculate_distance_based_on_longitude_latitude
+from pyearthmesh.classes.edge import pyedge
+from pyearthmesh.classes.vertex import pyvertex
+from pyearthmesh.utility.change_json_key_value import change_json_key_value
+from pyearthriver.classes.flowline import pyflowline
 from pyearthriver.classes.rivergraph import pyrivergraph
-
-from mpas_land_mesh.utilities.change_json_key_value import change_json_key_value
-from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
-from mpas_land_mesh.utilities.geometry import (
-    calculate_distance_based_on_longitude_latitude,
+from pyearthriver.formats.export_flowline import (
+    export_flowline_to_vector as export_flowline_to_geojson,
 )
-from mpas_land_mesh.utilities.io import export_flowline_to_geojson
-from mpas_land_mesh.utilities.object import convert_gcs_coordinates_to_flowline
+
+from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -46,17 +48,30 @@ logger = logging.getLogger(__name__)
 def convert_geometry_flowline(
     pGeometry_in, lFlowlineIndex: int, lID: int, lOutletID: int, lStream_order: int
 ):
-    aCoords = list()
     nPoint = pGeometry_in.GetPointCount()
     if nPoint < 2:
         logger.warning("Empty flowline detected (less than 2 points)")
         return None
-    else:
-        for i in range(0, nPoint):
-            pt = pGeometry_in.GetPoint(i)
-            aCoords.append([pt[0], pt[1]])
-    dummy1 = np.array(aCoords)
-    pFlowline = convert_gcs_coordinates_to_flowline(dummy1)
+
+    aVertex = [
+        pyvertex(
+            {
+                "dLongitude_degree": pGeometry_in.GetX(i),
+                "dLatitude_degree": pGeometry_in.GetY(i),
+            }
+        )
+        for i in range(nPoint)
+    ]
+    aEdge = [
+        pyedge(aVertex[j], aVertex[j + 1])
+        for j in range(nPoint - 1)
+        if aVertex[j] != aVertex[j + 1]
+    ]
+    if len(aEdge) == 0:
+        logger.warning("No edge is created")
+        return None
+
+    pFlowline = pyflowline(aEdge)
     pFlowline.lFlowlineIndex = lFlowlineIndex
     pFlowline.lFlowlineID = lID
     pFlowline.iStream_segment = lOutletID

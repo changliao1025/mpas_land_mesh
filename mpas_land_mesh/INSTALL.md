@@ -16,7 +16,8 @@ conda create -n ulrm python=3.9
 conda activate ulrm
 
 # Install dependencies
-conda install -c conda-forge gdal numpy scipy
+conda install -c conda-forge gdal numpy scipy pyyaml
+pip install pyearth pyearthmesh pyearthriver
 
 # Install ULRM workflow module
 cd mpas_land_mesh
@@ -27,7 +28,7 @@ pip install -e .
 
 ```bash
 # Install Python dependencies
-pip install numpy scipy
+pip install numpy scipy pyyaml pyearth pyearthmesh pyearthriver
 
 # Install GDAL (system-dependent, see below)
 

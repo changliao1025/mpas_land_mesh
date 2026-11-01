@@ -10,6 +10,14 @@ import logging
 # you can change this to your preferred output directory
 import os
 
+from pyearth.toolbox.conversion.convert_vector_to_global_raster import (
+    convert_vector_to_global_raster,
+)
+from pyearth.toolbox.management.vector.fields import (
+    add_field_to_vector_file,
+    get_field_and_value,
+)
+from pyearth.toolbox.management.vector.merge_features import merge_features
 from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
 
 from mpas_land_mesh.preprocessing.coastline import (
@@ -21,14 +29,6 @@ from mpas_land_mesh.utilities.constants import (
     DRAINAGE_AREA_MULTIPLIER,
     ISLAND_AREA_MULTIPLIER,
     KM2_TO_M2,
-)
-from mpas_land_mesh.utilities.raster import convert_vector_to_global_raster
-
-# using standalone dependency for this workflow, which will reduce the dependency to pyearth and pyflowline.
-from mpas_land_mesh.utilities.vector import (
-    add_field_to_vector_file,
-    get_field_and_value,
-    merge_features,
 )
 
 # Configure logging

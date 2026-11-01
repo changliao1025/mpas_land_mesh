@@ -2,10 +2,20 @@
 Setup script for ULRM Workflow module
 """
 
+from pathlib import Path
+
 from setuptools import find_packages, setup
 
-with open("README.md", encoding="utf-8") as fh:
-    long_description = fh.read()
+here = Path(__file__).resolve().parent
+readme_path = here / "README.md"
+if not readme_path.exists():
+    readme_path = here.parent / "README.md"
+
+if readme_path.exists():
+    with open(readme_path, encoding="utf-8") as fh:
+        long_description = fh.read()
+else:
+    long_description = "Lightweight module for unified land-river mesh workflows"
 
 setup(
     name="ulrm-workflow",
@@ -24,12 +34,16 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     python_requires=">=3.8",
     install_requires=[
         "numpy>=1.20.0",
         "scipy>=1.7.0",
         "pyyaml>=6.0",
+        "pyearth>=0.2.1",
+        "pyearthmesh>=0.1.1",
+        "pyearthriver>=0.1.0",
     ],
     extras_require={
         "gdal": ["gdal>=3.0.0"],

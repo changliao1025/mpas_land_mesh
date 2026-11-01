@@ -17,6 +17,7 @@ for mod in ["numpy", "numpy.typing", "osgeo", "osgeo.gdal", "osgeo.ogr", "osgeo.
             m.__path__ = []
             sys.modules[mod] = m
 
+from pyearth.gis.idl_handler import IdlHandler, IdlStrategy
 from pyearthmesh.config.config_manager import (
     DEFAULT_CONFIG,
     compile_workflow,
@@ -48,6 +49,48 @@ class TestWorkflowConfig(unittest.TestCase):
         self.assertIs(utils_create_workflow, create_workflow)
         self.assertIs(utils_compile_workflow, compile_workflow)
         self.assertEqual(UTILS_DEFAULT_CONFIG, DEFAULT_CONFIG)
+
+    def test_idl_handler_and_functions(self):
+        """Verify IDL crossing detection and splitting using pyearth IdlHandler."""
+        import numpy as np
+
+        handler = IdlHandler(strategy=IdlStrategy.CHECK_ONLY)
+        self.assertIsNotNone(handler)
+
+        # Polygon crossing the IDL
+        crossing_coords = np.array(
+            [
+                [170.0, -10.0],
+                [170.0, 10.0],
+                [-170.0, 10.0],
+                [-170.0, -10.0],
+                [170.0, -10.0],
+            ]
+        )
+        result = handler.detect(crossing_coords)
+        self.assertTrue(result.crosses_idl)
+
+        split_handler = IdlHandler(strategy=IdlStrategy.SPLIT)
+        split_result = split_handler.detect(crossing_coords)
+        self.assertTrue(split_result.crosses_idl)
+        self.assertIsNotNone(split_result.sub_polygons)
+        sub_polys = [sp for sp in split_result.sub_polygons if len(sp) >= 3]
+        self.assertEqual(len(sub_polys), 2)
+        for poly in sub_polys:
+            self.assertGreaterEqual(len(poly), 3)
+
+        # Normal non-crossing polygon
+        normal_coords = np.array(
+            [
+                [10.0, 10.0],
+                [20.0, 10.0],
+                [20.0, 20.0],
+                [10.0, 20.0],
+                [10.0, 10.0],
+            ]
+        )
+        normal_result = handler.detect(normal_coords)
+        self.assertFalse(normal_result.crosses_idl)
 
     def test_workflow_config_defaults_json(self):
         """Verify load_workflow_config loads JSON, merges defaults, and normalizes dates."""
