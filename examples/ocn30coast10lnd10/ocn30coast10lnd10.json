@@ -7,7 +7,8 @@
     "simplify_hydrosheds_river_network": false,
     "process_coastline": true,
     "debug": true,
-    "largest_outlets": 100
+    "largest_outlets": 100,
+    "run_on_hpc": false
   },
   "resolutions": {
     "ocean_km": 30,
@@ -23,9 +24,9 @@
       "default": "./input"
     },
     "output_workspace": {
-      "Windows": "./output",
+      "Windows": "D:/scratch/04model/pyhexwatershed/global",
       "Linux": "/compyfs/liao313/04model/pyhexwatershed/global",
-      "Darwin": "./output",
+      "Darwin": "/Users/changliao/scratch/earthmesh/ocn30coast10lnd10",
       "default": "./output"
     },
     "hydrosheds_rivers": {
@@ -37,7 +38,7 @@
     "region_geometry": {
       "Windows": "./input/region.geojson",
       "Linux": "/qfs/people/liao313/data/hexwatershed/global/vector/region.geojson",
-      "Darwin": "./input/region.geojson",
+      "Darwin": "/Users/changliao/data/hexwatershed/global/vector/region.geojson",
       "default": "./input/region.geojson"
     },
     "dam_vector": {
@@ -51,6 +52,13 @@
     "standalone": true,
     "create_directory": true,
     "hours": 5,
-    "slurm": "slurm"
+    "slurm": "slurm",
+    "ncolumn_space": 360,
+    "nrow_space": 180,
+    "iFlag_geom": true,
+    "iFlag_spac": true,
+    "iFlag_spac_ocean": true,
+    "iFlag_spac_land": true,
+    "iFlag_spac_coastline": true
   }
 }

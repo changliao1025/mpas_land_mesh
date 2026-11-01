@@ -29,6 +29,7 @@ setup(
     install_requires=[
         "numpy>=1.20.0",
         "scipy>=1.7.0",
+        "pyyaml>=6.0",
     ],
     extras_require={
         "gdal": ["gdal>=3.0.0"],

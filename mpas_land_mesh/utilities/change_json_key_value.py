@@ -6,7 +6,7 @@ import tempfile
 def change_json_key_value(
     sFilename_json_in,
     sKey,
-      new_value,
+    new_value,
     iFlag_basin_in=None, iBasin_index_in=None
 ):
     """

@@ -1,0 +1,98 @@
+{
+  "workflow": {
+    "date": "20260801",
+    "mesh_type": "mpas",
+    "case_index": 1,
+    "model": "jigsaw",
+    "simplify_hydrosheds_river_network": false,
+    "process_coastline": false,
+    "debug": true,
+    "largest_outlets": 10,
+    "run_on_hpc": false
+  },
+  "resolutions": {
+    "ocean_km": 100,
+    "land_km": 12.5,
+    "river_network_km": 5,
+    "coastline_km": 10,
+    "lake_boundary_km": 3,
+    "watershed_boundary_km": 3
+  },
+  "paths": {
+    "input_workspace": {
+      "Darwin": "/Users/changliao/data/hexwatershed",
+      "Linux": "/qfs/people/liao313/workspace/python/unified_land_river_mesh/data/global/input",
+      "Windows": "D:/data/modeldata/hexwatershed",
+      "default": "./input"
+    },
+    "output_workspace": {
+      "Darwin": "/Users/changliao/scratch/earthmesh/huanghe",
+      "Linux": "/data2/share/liaochang/04model/jigsaw/huanghe",
+      "Windows": "D:/scratch/04model/jigsaw/huanghe",
+      "default": "./output"
+    },
+    "river_network_vector": {
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/vector/flowline_hydroshed_simplified_clipped_clean.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/flowline_hydroshed_simplified_clipped_clean.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/flowline_hydroshed_simplified_clipped_clean.geojson",
+      "default": "./data/flowline_hydroshed_simplified_clipped_clean.geojson"
+    },
+    "river_network_raster": {
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/raster/river_networks.tif",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/raster/river_networks.tif",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/raster/river_networks.tif",
+      "default": "./data/river_networks.tif"
+    },
+    "lake_boundary_vector": {
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
+      "default": "./data/lake_boundary_hydrobasins_huanghe.geojson"
+    },
+    "lake_boundary_raster": {
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/raster/lake_boundary_mask.tif",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/raster/lake_boundary_mask.tif",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/raster/lake_boundary_mask.tif",
+      "default": "./data/lake_boundary_mask.tif"
+    },
+    "watershed_boundary_vector": "",
+    "watershed_boundary_raster": {
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
+      "default": "./data/basin_boundary_mask.tif"
+    },
+    "coastline_vector": "",
+    "coastline_raster": {
+      "Darwin": "/Users/changliao/scratch/land_ocean_mask_wo_island_buffered_fixed.tif",
+      "Linux": "/data2/share/liaochang/04model/jigsaw/global/coastline/land_ocean_mask_wo_island_buffered_fixed.tif",
+      "Windows": "D:/scratch/04model/jigsaw/global/coastline/land_ocean_mask_wo_island_buffered_fixed.tif",
+      "default": "./data/land_ocean_mask_wo_island_buffered_fixed.tif"
+    },
+    "region_geometry": {
+      "Darwin": "/Users/changliao/data/hexwatershed/global/vector/region.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/global/vector/region.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/global/vector/region.geojson",
+      "default": "./data/region.geojson"
+    },
+    "dam_vector": ""
+  },
+  "jigsaw": {
+    "standalone": true,
+    "create_directory": true,
+    "hours": 3,
+    "slurm": "cpu_single",
+    "ncolumn_space": 3600,
+    "nrow_space": 1800,
+    "iFlag_geom": true,
+    "iFlag_spac": true,
+    "iFlag_spac_ocean": true,
+    "iFlag_spac_land": true,
+    "iFlag_geom_river_network": true,
+    "iFlag_spac_river_network": true,
+    "iFlag_geom_lake_boundary": true,
+    "iFlag_spac_lake_boundary": true,
+    "iFlag_spac_watershed_boundary": true,
+    "iFlag_spac_coastline": true
+  }
+}

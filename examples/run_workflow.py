@@ -16,7 +16,7 @@ from mpas_land_mesh.utilities.constants import KM2_TO_M2, ISLAND_AREA_MULTIPLIER
 from mpas_land_mesh.preprocessing.river_network import simplify_hydrorivers_network
 from mpas_land_mesh.preprocessing.coastline import create_land_ocean_mask_from_naturalearth, fix_naturalearth_hydrosheds_incompatibility
 
-from mpas_land_mesh.utilities.config import load_workflow_config, create_jigsaw_case
+from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +26,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('config', help='Path to the workflow JSON configuration')
+parser.add_argument(
+    'config',
+    nargs='?',
+    default='workflow_config.yaml',
+    help='Path to the workflow YAML or JSON configuration file (default: workflow_config.yaml)'
+)
 args = parser.parse_args()
 config = load_workflow_config(args.config)
 workflow = config['workflow']
@@ -158,23 +163,23 @@ else:
 
 iFlag_debug = int(workflow['debug'])
 if iFlag_debug == 1:
-    generated_files = {
-        'river_network_vector': sFilename_flowline_hydrosheds_out,
-        'river_network_raster': sFilename_river_network_raster,
-        'coastline_raster': sFilename_tif_wo_island,
-        'dam_vector': sFilename_dam,
-    }
+    config['paths']['river_network_vector'] = sFilename_flowline_hydrosheds_out
+    config['paths']['river_network_raster'] = sFilename_river_network_raster
+    config['paths']['coastline_raster'] = sFilename_tif_wo_island
+    if sFilename_dam:
+        config['paths']['dam_vector'] = sFilename_dam
 
-    # Build JIGSAW deck in memory and create case instance directly
-    oJigsaw = create_jigsaw_case(
-        config,
-        generated_files=generated_files,
-        output_workspace=sWorkspace_output,
-        iFlag_create_directory_in=1,
-    )
+    # Build and execute workflow object via pyearthmesh
+    oWorkflow = create_workflow(config)
 
-    oJigsaw._jigsaw_create_hpc_job(sSlurm_in=jigsaw['slurm'], hours_in=jigsaw['hours'])
-    # now you should manually submit the job
+    if workflow.get('run_on_hpc'):
+        logger.info('Generating HPC SLURM job scripts...')
+        oWorkflow.create_hpc_job()
+        logger.info('HPC job scripts written to: %s', oWorkflow.output_workspace)
+    else:
+        logger.info('Setting up and executing mesh generation...')
+        oWorkflow.setup()
+        oWorkflow.run()
 
 else:
     pass

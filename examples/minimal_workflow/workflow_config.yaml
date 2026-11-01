@@ -1,0 +1,67 @@
+# ==============================================================================
+# Tier 1 Specification: Minimal MPAS Mesh Workflow
+#
+# A single sectioned YAML configuration file serving as the primary source of truth.
+# Loaded by pyearthmesh.config.config_manager.create_workflow to instantiate the
+# MPASWorkflow and execute mesh generation locally or emit SLURM HPC batch scripts.
+# ==============================================================================
+
+# High-level workflow orchestration and execution targets
+workflow:
+  date: null                                      # Run date (YYYYMMDD); null defaults to today
+  mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
+  case_index: 1                                   # Case index number
+  model: jigsaw                                   # Core mesh generation backend
+  simplify_hydrosheds_river_network: false        # Optional line simplification for rivers
+  process_coastline: false                        # Coastline masking and buffering
+  debug: true                                     # Enable diagnostic logging
+  largest_outlets: 10                             # Retain top N largest basin outlets
+  run_on_hpc: false                               # Set true to generate SLURM batch job scripts
+
+# Multi-scale target cell resolutions (in kilometers)
+resolutions:
+  ocean_km: 100                                   # Coarse open ocean resolution
+  land_km: 100                                    # Land surface resolution
+  river_network_km: 10                            # River network refinement
+  coastline_km: 10                                # Coastal transition resolution
+
+# Cross-platform dataset and workspace paths
+paths:
+  input_workspace:
+    Windows: ./input
+    Linux: ./input
+    Darwin: ./input
+    default: ./input
+  output_workspace:
+    Windows: ./output
+    Linux: ./output
+    Darwin: ./output
+    default: ./output
+  hydrosheds_rivers:
+    Windows: ./input/HydroRIVERS_v10.gpkg
+    Linux: ./input/HydroRIVERS_v10.gpkg
+    Darwin: ./input/HydroRIVERS_v10.gpkg
+    default: ./input/HydroRIVERS_v10.gpkg
+  region_geometry:
+    Windows: ./input/region.geojson
+    Linux: ./input/region.geojson
+    Darwin: ./input/region.geojson
+    default: ./input/region.geojson
+  dam_vector:
+    Windows: ./input/dams.geojson
+    Linux: ./input/dams.geojson
+    Darwin: ./input/dams.geojson
+    default: ./input/dams.geojson
+
+# Backend tuning parameters and spacing field flags for JIGSAW
+jigsaw:
+  standalone: true                                # Run standalone generator without external wrapper
+  create_directory: true                          # Auto-create case subfolder in workspace
+  hours: 5                                        # SLURM walltime allocation (hours)
+  slurm: slurm                                    # SLURM partition or queue name
+  ncolumn_space: 360                              # Spacing raster longitudinal grid cells (1.0 deg)
+  nrow_space: 180                                 # Spacing raster latitudinal grid cells (1.0 deg)
+  iFlag_geom: true                                # Build boundary geometry file (.msh)
+  iFlag_spac: true                                # Build spacing field raster (.msh)
+  iFlag_spac_ocean: true                          # Apply ocean spacing constraint
+  iFlag_spac_land: true                           # Apply land spacing constraint

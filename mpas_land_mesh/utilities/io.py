@@ -7,8 +7,8 @@ except Exception:  # pragma: no cover - environment-dependent
     ogr = None
     osr = None
 
-from mpas_land_mesh.classes.edge import pyedge
-from mpas_land_mesh.classes.link import pycelllink
+from pyearthmesh.classes.edge import pyedge
+from pyearthmesh.classes.link import pycelllink
 
 
 def export_vertex_to_geojson(

@@ -1,0 +1,68 @@
+# ==============================================================================
+# Tier 1 Specification: Global 30km Ocean, 10km Land, 10km Coastline MPAS Workflow
+#
+# A single sectioned YAML configuration file serving as the primary source of truth.
+# Drives global variable-resolution mesh generation refining coastlines and landmasses
+# from 30 km in open ocean down to 10 km on land and coastal buffer zones.
+# ==============================================================================
+
+# High-level workflow orchestration and execution targets
+workflow:
+  date: "20260601"                                # Run date (YYYYMMDD)
+  mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
+  case_index: 1                                   # Case index number
+  model: jigsaw                                   # Core mesh generation backend
+  simplify_hydrosheds_river_network: false        # Optional line simplification for rivers
+  process_coastline: true                         # Enable coastline buffer processing
+  debug: true                                     # Enable diagnostic logging
+  largest_outlets: 100                            # Retain top N largest basin outlets
+  run_on_hpc: false                               # Set true to generate SLURM batch job scripts
+
+# Multi-scale target cell resolutions (in kilometers)
+resolutions:
+  ocean_km: 30                                    # Open ocean target resolution (30 km)
+  land_km: 10                                     # Continental land background resolution (10 km)
+  river_network_km: 10                            # River corridor refinement (10 km)
+  coastline_km: 10                                # Coastal buffer transition resolution (10 km)
+
+# Cross-platform dataset and workspace paths
+paths:
+  input_workspace:
+    Windows: ./input
+    Linux: /compyfs/liao313/04model/pyhexwatershed/global
+    Darwin: ./input
+    default: ./input
+  output_workspace:
+    Windows: D:/scratch/04model/pyhexwatershed/global
+    Linux: /compyfs/liao313/04model/pyhexwatershed/global
+    Darwin: /Users/changliao/scratch/earthmesh/ocn30coast10lnd10
+    default: ./output
+  hydrosheds_rivers:
+    Windows: ./input/HydroRIVERS_v10.shp
+    Linux: /compyfs/liao313/00raw/hydrology/hydrosheds/hydroriver/HydroRIVERS_v10_shp/HydroRIVERS_v10_shp/HydroRIVERS_v10.shp
+    Darwin: ./input/HydroRIVERS_v10.shp
+    default: ./input/HydroRIVERS_v10.shp
+  region_geometry:
+    Windows: ./input/region.geojson
+    Linux: /qfs/people/liao313/data/hexwatershed/global/vector/region.geojson
+    Darwin: /Users/changliao/data/hexwatershed/global/vector/region.geojson
+    default: ./input/region.geojson
+  dam_vector:
+    Windows: ./input/GRanD_dams_v1_3_merged.geojson
+    Linux: /compyfs/liao313/00raw/dam/GRanD_Version_1_3/GRanD_dams_v1_3_merged.geojson
+    Darwin: ./input/GRanD_dams_v1_3_merged.geojson
+    default: ./input/GRanD_dams_v1_3_merged.geojson
+
+# Backend tuning parameters and spacing field flags for JIGSAW
+jigsaw:
+  standalone: true                                # Run standalone generator without external wrapper
+  create_directory: true                          # Auto-create case subfolder in workspace
+  hours: 5                                        # SLURM walltime allocation (hours)
+  slurm: slurm                                    # SLURM partition or queue name
+  ncolumn_space: 360                              # Spacing raster longitudinal grid cells (1.0 deg)
+  nrow_space: 180                                 # Spacing raster latitudinal grid cells (1.0 deg)
+  iFlag_geom: true                                # Build boundary geometry file (.msh)
+  iFlag_spac: true                                # Build spacing field raster (.msh)
+  iFlag_spac_ocean: true                          # Apply ocean spacing constraint
+  iFlag_spac_land: true                           # Apply land spacing constraint
+  iFlag_spac_coastline: true                      # Apply coastline buffer refinement

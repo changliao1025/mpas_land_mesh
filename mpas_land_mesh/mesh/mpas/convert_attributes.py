@@ -7,9 +7,9 @@ mesh type (iMesh_type == 4), adapted from pyflowline without external dependenci
 
 import numpy as np
 
-from mpas_land_mesh.classes.vertex import pyvertex
-from mpas_land_mesh.classes.edge import pyedge
-from mpas_land_mesh.classes.mpas import pympas
+from pyearthmesh.classes.vertex import pyvertex
+from pyearthmesh.classes.edge import pyedge
+from pyearthmesh.classes.mpas import pympas
 
 
 def convert_gcs_attributes_to_cell(

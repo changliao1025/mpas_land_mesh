@@ -17,9 +17,8 @@ except Exception:  # pragma: no cover - environment-dependent
 
 from mpas_land_mesh.utilities.spatial_reference import reproject_coordinates
 
-# NOTE: mpas_land_mesh.classes imports (pyvertex, pyedge, pyflowline) are done
-# lazily inside each function to avoid circular imports:
-#   object.py  ←  edge.py  ←  object.py  (via flowline.py → edge.py)
+# NOTE: Mesh/river classes (pyvertex, pyedge, pyflowline) are imported from
+# pyearthmesh and pyearthriver.
 
 
 # Configure logger for this module
@@ -106,7 +105,7 @@ def slerp(n1, n2, t):
     Returns:
         Interpolated n-vector
     """
-    from mpas_land_mesh.classes.nvector import pynvector
+    from pyearth.toolbox.mesh.nvector import pynvector
 
     use_high_precision = getattr(n1, "use_high_precision", False)
     dtype = np.float128 if use_high_precision else np.float64
@@ -200,7 +199,7 @@ def split_line_by_length(pLine_in, dLength_in, tolerance=1e-6, use_high_precisio
         The adaptive segmentation limits the number of segments based on numerical
         precision to prevent creating segments that cannot be distinguished.
     """
-    from mpas_land_mesh.classes.edge import pyedge
+    from pyearthmesh.classes.edge import pyedge
 
     # Input validation
     if dLength_in <= 0:
@@ -305,9 +304,9 @@ def convert_gcs_coordinates_to_flowline(aCoordinates_in):
     Returns:
         _type_: _description_
     """
-    from mpas_land_mesh.classes.vertex import pyvertex
-    from mpas_land_mesh.classes.edge import pyedge
-    from mpas_land_mesh.classes.flowline import pyflowline
+    from pyearthmesh.classes.vertex import pyvertex
+    from pyearthmesh.classes.edge import pyedge
+    from pyearthriver.classes.flowline import pyflowline
 
     npoint = len(aCoordinates_in)
     aVertex = [
@@ -327,9 +326,9 @@ def convert_gcs_coordinates_to_flowline(aCoordinates_in):
 
 
 def convert_pcs_coordinates_to_flowline(aCoordinates_in, pProjection_in):
-    from mpas_land_mesh.classes.vertex import pyvertex
-    from mpas_land_mesh.classes.edge import pyedge
-    from mpas_land_mesh.classes.flowline import pyflowline
+    from pyearthmesh.classes.vertex import pyvertex
+    from pyearthmesh.classes.edge import pyedge
+    from pyearthriver.classes.flowline import pyflowline
 
     npoint = len(aCoordinates_in)
 

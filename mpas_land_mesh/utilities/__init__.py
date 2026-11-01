@@ -3,10 +3,8 @@ Core utilities for ULRM workflow
 
 Note on import structure
 ------------------------
-``object.py`` and ``io.py`` import from ``mpas_land_mesh.classes`` (edge, vertex,
-flowline, link), which in turn import back from ``mpas_land_mesh.utilities``.
-To break that circular dependency those two modules are **not** imported here at
-package-init time; import them directly when needed:
+``object.py`` and ``io.py`` import mesh/river classes (edge, vertex, flowline, link)
+from ``pyearthmesh`` and ``pyearthriver``. Import them directly when needed:
 
     from mpas_land_mesh.utilities.object import find_vertex_on_edge, ...
     from mpas_land_mesh.utilities.io import export_vertex_to_geojson, ...
@@ -89,19 +87,14 @@ from .spatial_reference import (
     reproject_coordinates_batch,
 )
 
-# --- config (unified) ---
-from .config import (
+# --- config (pyearthmesh unified) ---
+from pyearthmesh.config.config_manager import (
     DEFAULT_CONFIG,
-    DEFAULT_JIGSAW_CONFIG,
-    DEFAULT_WORKFLOW_CONFIG,
-    JigsawConfigManager,
-    WorkflowConfig,
-    create_jigsaw_case,
-    create_jigsaw_template_configuration_file,
+    compile_workflow,
+    create_workflow,
+    dump_workflow_config,
     load_workflow_config,
-    read_jigsaw_configuration_file,
 )
-from mpas_land_mesh.classes.jigsawcase import jigsawcase
 
 # --- change_json_key_value ---
 from .change_json_key_value import (
@@ -109,9 +102,7 @@ from .change_json_key_value import (
     change_json_keys_values,
 )
 
-# object and io are intentionally excluded from top-level imports to avoid
-# circular imports (they depend on mpas_land_mesh.classes which depends on
-# mpas_land_mesh.utilities).  Import them directly from their modules:
+# object and io are imported directly from their modules when needed:
 #   from mpas_land_mesh.utilities.object import find_vertex_on_edge, slerp, ...
 #   from mpas_land_mesh.utilities.io import export_vertex_to_geojson, ...
 
@@ -169,17 +160,12 @@ __all__ = [
     # spatial_reference
     "reproject_coordinates",
     "reproject_coordinates_batch",
-    # config (unified)
+    # config (pyearthmesh unified)
     "DEFAULT_CONFIG",
-    "DEFAULT_JIGSAW_CONFIG",
-    "DEFAULT_WORKFLOW_CONFIG",
-    "WorkflowConfig",
     "load_workflow_config",
-    "create_jigsaw_case",
-    "jigsawcase",
-    "JigsawConfigManager",
-    "create_jigsaw_template_configuration_file",
-    "read_jigsaw_configuration_file",
+    "dump_workflow_config",
+    "create_workflow",
+    "compile_workflow",
     # change_json_key_value
     "change_json_key_value",
     "change_json_keys_values",

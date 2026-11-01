@@ -21,16 +21,6 @@ mpas_land_mesh/
 ├── MIGRATION.md                    # Migration notes
 ├── requirements.txt                # Minimal dependencies
 ├── setup.py                        # Package setup
-├── classes/                        # Core data-model classes
-│   ├── confluence.py
-│   ├── edge.py
-│   ├── flowline.py
-│   ├── jigsawcase.py               # JIGSAW case object
-│   ├── link.py
-│   ├── mpas.py
-│   ├── nvector.py
-│   ├── rivergraph.py
-│   └── vertex.py
 ├── mesh/                           # Mesh generation
 │   ├── jigsaw/                     # JIGSAW mesh utilities
 │   │   ├── inpoly2.py
@@ -52,7 +42,6 @@ mpas_land_mesh/
 └── utilities/                      # Core utility functions
     ├── __init__.py
     ├── change_json_key_value.py    # JSON configuration helpers
-    ├── config_manager.py           # JIGSAW configuration manager
     ├── constants.py                # Physical constants
     ├── gcsbuffer.py                # Geographic buffer utilities
     ├── geometry.py                 # Spherical geometry calculations
@@ -64,10 +53,12 @@ mpas_land_mesh/
     └── vector.py                   # Vector file operations
 ```
 
-> **Note on circular imports:** `utilities/object.py` and `utilities/io.py` depend on
-> `mpas_land_mesh.classes`, which in turn imports from `mpas_land_mesh.utilities`.
-> These two modules are **not** re-exported from `mpas_land_mesh.utilities` at
-> package-init time to avoid circular imports.  Import them directly:
+> **Note on imports:** Data classes are shared across packages:
+> - Base geometry and topology (`pyvertex`, `pyedge`, `pynvector`) are provided by `pyearth`.
+> - River network topology (`pyrivergraph`, `pyflowline`, `pyconfluence`) is provided by `pyearthriver`.
+> - Mesh cell definitions (`pympas`, `pycelllink`, `pymeshcell`) and workflows are provided by `pyearthmesh`.
+>
+> `utilities/object.py` and `utilities/io.py` can be imported directly when needed:
 >
 > ```python
 > from mpas_land_mesh.utilities.object import find_vertex_on_edge, slerp
@@ -144,10 +135,12 @@ Optional (for coastline processing):
 - [`fix_naturalearth_hydrosheds_incompatibility()`](preprocessing/coastlines.py) — reconcile Natural Earth and HydroSHEDS coastlines
 - [`geometries_bbox_overlap()`](preprocessing/coastlines.py) — test bounding-box overlap between geometries
 
-### Configuration Management (`mpas_land_mesh.utilities`)
-- [`create_jigsaw_template_configuration_file()`](utilities/config_manager.py) — write a JIGSAW JSON config template
-- [`read_jigsaw_configuration_file()`](utilities/config_manager.py) — read a JIGSAW JSON config and return a `jigsawcase` object
-- [`JigsawConfigManager`](utilities/config_manager.py) — class with `get_default_config()`, `create_template_config()`, `load_config()`
+### Configuration & Workflow Management (`pyearthmesh.config.config_manager`)
+- [`load_workflow_config()`](plan/YAML_WORKFLOW_CONFIGURATION.md) — load single sectioned workflow YAML/JSON configuration
+- [`dump_workflow_config()`](plan/YAML_WORKFLOW_CONFIGURATION.md) — export workflow configuration to YAML or JSON
+- [`create_workflow()`](plan/YAML_WORKFLOW_CONFIGURATION.md) — instantiate mesh workflow object and case adapter
+- [`compile_workflow()`](plan/YAML_WORKFLOW_CONFIGURATION.md) — compile user-tier workflow spec into backend mesh parameters
+- `DEFAULT_CONFIG` — reference default dictionary schema for all workflows
 
 ### JSON Utilities (`mpas_land_mesh.utilities`)
 - [`change_json_key_value()`](utilities/change_json_key_value.py) — safely update a single key in a JSON file
@@ -156,37 +149,20 @@ Optional (for coastline processing):
 ## Installation
 
 ```bash
-# Recommended: conda for easier GDAL installation
-conda install -c conda-forge gdal numpy scipy rtree
+# Recommended: conda environment with core dependencies
+conda install -c conda-forge gdal numpy scipy rtree pyyaml
 
-# Or pip (GDAL must be installed separately)
-pip install numpy scipy rtree
-# Linux: apt-get install python3-gdal
-# macOS: brew install gdal && pip install gdal
-```
-
-For optional coastline processing:
-```bash
-pip install pyearth pyearthbuffer
+# Install pyearth, pyearthriver, and pyearthmesh
+pip install pyearth pyearthriver pyearthmesh pyyaml
 ```
 
 ## Usage
 
 ```python
-from mpas_land_mesh.utilities import (
-    get_field_and_value,
-    merge_features,
-    add_field_to_vector_file,
-    convert_vector_to_global_raster,
-    create_jigsaw_template_configuration_file,
-    read_jigsaw_configuration_file,
-    change_json_key_value,
-)
-from mpas_land_mesh.preprocessing import (
-    simplify_hydrorivers_networks,
-)
+from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
+from mpas_land_mesh.preprocessing import simplify_hydrorivers_networks
 
-# --- Step 1: simplify river network ---
+# --- Step 1: Preprocess river network ---
 simplify_hydrorivers_networks(
     sFilename_flowline_hydroshed_in='HydroRIVERS_v10.shp',
     sFilename_flowline_hydroshed_out='river_simplified.geojson',
@@ -195,34 +171,15 @@ simplify_hydrorivers_networks(
     nOutlet_largest=10,
 )
 
-# Rasterize the simplified network
-convert_vector_to_global_raster(
-    'river_simplified.geojson',
-    'river_network.tif',
-    dResolution_x_in=30/3600 * 10,
-    dResolution_y_in=30/3600 * 10,
-)
+# --- Step 2: Run mesh generation via unified YAML workflow (with # comments) ---
+workflow = create_workflow('workflow_config.yaml')
 
-# --- Step 2: create JIGSAW configuration ---
-create_jigsaw_template_configuration_file('jigsaw_config.json')
-
-change_json_key_value('jigsaw_config.json', 'sWorkspace_output', '/path/to/output')
-change_json_key_value('jigsaw_config.json', 'iFlag_geom', 'true')
-change_json_key_value('jigsaw_config.json', 'iFlag_spac', 'true')
-change_json_key_value('jigsaw_config.json', 'dResolution_ocean', 100)
-change_json_key_value('jigsaw_config.json', 'dResolution_land',  100)
-change_json_key_value('jigsaw_config.json', 'dResolution_river_network', 10)
-change_json_key_value('jigsaw_config.json', 'sFilename_river_network_raster', 'river_network.tif')
-
-# --- Step 3: read config and run JIGSAW ---
-oJigsaw = read_jigsaw_configuration_file(
-    'jigsaw_config.json',
-    iCase_index_in=1,
-    sDate_in='20260401',
-    iFlag_create_directory_in=1,
-)
-oJigsaw._jigsaw_create_hpc_job(sSlurm_in='slurm', hours_in=5)
-# Submit the generated SLURM script manually
+# Run locally or create HPC job scripts
+if workflow.run_on_hpc:
+    workflow.create_hpc_job(hours=5)
+else:
+    workflow.setup()
+    workflow.run()
 ```
 
 See [`examples/run_minimal_workflow.py`](../examples/run_minimal_workflow.py) for a complete end-to-end example.

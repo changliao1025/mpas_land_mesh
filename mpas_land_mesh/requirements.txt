@@ -11,6 +11,7 @@
 
 numpy>=1.20.0
 scipy>=1.7.0
+pyyaml>=6.0
 
 # GDAL installation notes:
 # - Linux: apt-get install python3-gdal or conda install gdal

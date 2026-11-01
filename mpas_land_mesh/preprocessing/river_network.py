@@ -33,7 +33,7 @@ from mpas_land_mesh.utilities.geometry  import (
 from mpas_land_mesh.utilities.gcsbuffer import create_wkt_buffer_distance
 from mpas_land_mesh.utilities.object import convert_gcs_coordinates_to_flowline
 from mpas_land_mesh.utilities.io import export_flowline_to_geojson
-from mpas_land_mesh.classes.rivergraph import pyrivergraph
+from pyearthriver.classes.rivergraph import pyrivergraph
 from mpas_land_mesh.utilities.change_json_key_value import change_json_key_value
 
 # Set up logger for this module

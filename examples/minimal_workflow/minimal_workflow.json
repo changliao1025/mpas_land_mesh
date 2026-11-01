@@ -7,7 +7,8 @@
     "simplify_hydrosheds_river_network": false,
     "process_coastline": false,
     "debug": true,
-    "largest_outlets": 10
+    "largest_outlets": 10,
+    "run_on_hpc": false
   },
   "resolutions": {
     "ocean_km": 100,
@@ -51,6 +52,12 @@
     "standalone": true,
     "create_directory": true,
     "hours": 5,
-    "slurm": "slurm"
+    "slurm": "slurm",
+    "ncolumn_space": 360,
+    "nrow_space": 180,
+    "iFlag_geom": true,
+    "iFlag_spac": true,
+    "iFlag_spac_ocean": true,
+    "iFlag_spac_land": true
   }
 }
