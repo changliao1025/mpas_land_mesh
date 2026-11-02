@@ -32,6 +32,14 @@ DEFAULT_ULRM_CONFIG: dict[str, Any] = {
         "island_area_multiplier": 10.0,
         "raster_buffer_pixel": 2,
         "source": "naturalearth",  # 'naturalearth', 'shoreline', or 'basins'
+        "col_id": None,
+        "col_main_riv": None,
+        "col_stream_order": None,
+        "col_drainage_area": None,
+        "col_next_down": None,
+        "col_endorheic": None,
+        "drainage_area_unit_multiplier": 1.0e6,
+        "endorheic": 0,
     },
     "resolutions": {
         "ocean_km": 100.0,
@@ -46,7 +54,8 @@ DEFAULT_ULRM_CONFIG: dict[str, Any] = {
     "paths": {
         "input_workspace": "./input",
         "output_workspace": "./output",
-        "hydrosheds_rivers": "",
+        "river_network_raw": "",
+        "hydrosheds_rivers": "",  # legacy alias for river_network_raw
         "region_geometry": "",
         "dam_vector": "",
         "naturalearth_land": "",
@@ -174,6 +183,14 @@ def load_ulrm_config(
     # Resolve paths (multi-platform OS dictionaries & relative paths)
     if "paths" in config:
         config["paths"] = _resolve_paths(config["paths"], base_dir)
+        if config["paths"].get("river_network_raw") and not config["paths"].get(
+            "hydrosheds_rivers"
+        ):
+            config["paths"]["hydrosheds_rivers"] = config["paths"]["river_network_raw"]
+        elif config["paths"].get("hydrosheds_rivers") and not config["paths"].get(
+            "river_network_raw"
+        ):
+            config["paths"]["river_network_raw"] = config["paths"]["hydrosheds_rivers"]
 
     return config
 

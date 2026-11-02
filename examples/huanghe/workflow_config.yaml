@@ -12,18 +12,18 @@ workflow:
   mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
   case_index: 1                                   # Case index number
   model: jigsaw                                   # Core mesh generation backend
-  simplify_hydrosheds_river_network: false        # Optional line simplification for rivers
-  process_coastline: false                        # Coastline masking and buffering
+  simplify_hydrosheds_river_network: true        # Optional line simplification for rivers
+  process_coastline: true                        # Coastline masking and buffering
   debug: true                                     # Enable diagnostic logging
-  largest_outlets: 10                            # Retain top N largest basin outlets
+  largest_outlets: 1                            # Retain top N largest basin outlets
   run_on_hpc: false                               # Set true to generate SLURM batch job scripts
 
 # Multi-scale target cell resolutions (in kilometers)
 resolutions:
   ocean_km: 100                                   # Coarse open ocean resolution (100 km)
-  land_km: 12.5                                   # Background land resolution (12.5 km)
-  river_network_km: 5                             # River network corridor refinement (5 km)
-  coastline_km: 10                                # Near-shore transition resolution (10 km)
+  land_km: 8.0                                   # Background land resolution (12.5 km)
+  river_network_km: 3                             # River network corridor refinement (5 km)
+  coastline_km: 3                                # Near-shore transition resolution (10 km)
   lake_boundary_km: 3                             # Lake perimeter refinement (3 km)
   watershed_boundary_km: 3                        # Watershed divide refinement (3 km)
 

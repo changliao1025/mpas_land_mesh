@@ -7,6 +7,7 @@ specification for execution by pyearthmesh.
 
 from __future__ import annotations
 
+import glob
 import logging
 import os
 from pathlib import Path
@@ -110,51 +111,151 @@ class ULRMWorkflow:
         # -------------------------------------------------------------------
         # 1. River Network Preprocessing
         # -------------------------------------------------------------------
-        sFilename_flowline_hydrosheds_in = paths.get("hydrosheds_rivers", "")
-        sFilename_flowline_hydroshed_tmp = f"HydroRIVERS_v10_simplified_{sDistance_tolerance}_{sDrainage_area_threshold}.geojson"
-        sFilename_flowline_hydrosheds_out = os.path.join(
-            sWorkspace_river_network_output, sFilename_flowline_hydroshed_tmp
+        sFilename_flowline_raw_in = (
+            paths.get("river_network_raw")
+            or paths.get("raw_rivers")
+            or paths.get("raw_river_network")
+            or paths.get("hydrosheds_rivers")
+            or ""
+        )
+        bSimplify_rivers = bool(preprocessing.get("simplify_rivers", False))
+
+        if (
+            not sFilename_flowline_raw_in
+            and bSimplify_rivers
+            and paths.get("river_network_vector")
+        ):
+            sFilename_flowline_raw_in = paths["river_network_vector"]
+
+        if sFilename_flowline_raw_in:
+            raw_stem = Path(sFilename_flowline_raw_in).stem
+            if "simplified" in raw_stem.lower():
+                base_name = (
+                    f"{raw_stem}_{sDistance_tolerance}_{sDrainage_area_threshold}"
+                )
+            else:
+                base_name = f"{raw_stem}_simplified_{sDistance_tolerance}_{sDrainage_area_threshold}"
+        else:
+            base_name = f"river_network_simplified_{sDistance_tolerance}_{sDrainage_area_threshold}"
+
+        sFilename_flowline_simplified_out = os.path.join(
+            sWorkspace_river_network_output, f"{base_name}.geojson"
         )
         sFilename_river_network_raster = os.path.join(
             sWorkspace_river_network_output, "river_network_raster.tif"
         )
+        sFilename_flowline_out = sFilename_flowline_simplified_out
 
-        bSimplify_rivers = bool(preprocessing.get("simplify_rivers", False))
         if (
             bSimplify_rivers
-            and sFilename_flowline_hydrosheds_in
-            and os.path.exists(sFilename_flowline_hydrosheds_in)
+            and sFilename_flowline_raw_in
+            and os.path.exists(sFilename_flowline_raw_in)
         ):
-            logger.info(
-                "Simplifying river network from: %s", sFilename_flowline_hydrosheds_in
+            logger.info("Simplifying river network from: %s", sFilename_flowline_raw_in)
+
+            # Optional column mappings for general hydrographic datasets (HydroRIVERS, NHDPlus, MERIT, etc.)
+            river_cols = preprocessing.get("river_columns") or {}
+            sCol_id = preprocessing.get("col_id") or river_cols.get("col_id")
+            sCol_main_riv = preprocessing.get("col_main_riv") or river_cols.get(
+                "col_main_riv"
             )
+            sCol_stream_order = preprocessing.get("col_stream_order") or river_cols.get(
+                "col_stream_order"
+            )
+            sCol_drainage_area = preprocessing.get(
+                "col_drainage_area"
+            ) or river_cols.get("col_drainage_area")
+            sCol_next_down = preprocessing.get("col_next_down") or river_cols.get(
+                "col_next_down"
+            )
+            sCol_endorheic = preprocessing.get("col_endorheic") or river_cols.get(
+                "col_endorheic"
+            )
+            dDrainage_multiplier = float(
+                preprocessing.get("drainage_area_multiplier_unit")
+                or preprocessing.get("drainage_area_unit_multiplier")
+                or 1.0e6
+            )
+            iFlag_endorheic = int(preprocessing.get("endorheic", 0))
+
             simplify_river_network(
-                sFilename_flowline_hydroshed_in=sFilename_flowline_hydrosheds_in,
-                sFilename_flowline_hydroshed_out=sFilename_flowline_hydrosheds_out,
+                sFilename_flowline_hydroshed_in=sFilename_flowline_raw_in,
+                sFilename_flowline_hydroshed_out=sFilename_flowline_simplified_out,
                 dDistance_tolerance_in=dDistance_tolerance,
                 dDrainage_area_threshold_in=dDrainage_area_threshold,
+                iFlag_endorheic_in=iFlag_endorheic,
                 nOutlet_largest=nOutlet_largest,
+                sCol_id=sCol_id,
+                sCol_main_riv=sCol_main_riv,
+                sCol_stream_order=sCol_stream_order,
+                sCol_drainage_area=sCol_drainage_area,
+                sCol_next_down=sCol_next_down,
+                sCol_endorheic=sCol_endorheic,
+                dDrainage_area_multiplier=dDrainage_multiplier,
             )
             logger.info(
                 "Rasterizing simplified river network to: %s",
                 sFilename_river_network_raster,
             )
             convert_vector_to_global_raster(
-                sFilename_flowline_hydrosheds_out,
+                sFilename_flowline_simplified_out,
                 sFilename_river_network_raster,
                 dResolution_x_in,
                 dResolution_y_in,
             )
-        elif os.path.exists(sFilename_flowline_hydrosheds_out) and os.path.exists(
+            sFilename_flowline_out = sFilename_flowline_simplified_out
+        elif os.path.exists(sFilename_flowline_simplified_out) and os.path.exists(
             sFilename_river_network_raster
         ):
             logger.info(
                 "Reusing existing river network outputs in: %s",
                 sWorkspace_river_network_output,
             )
+            sFilename_flowline_out = sFilename_flowline_simplified_out
         elif paths.get("river_network_vector"):
-            sFilename_flowline_hydrosheds_out = paths["river_network_vector"]
+            sFilename_flowline_out = paths["river_network_vector"]
             sFilename_river_network_raster = paths.get("river_network_raster", "")
+            if (
+                not sFilename_river_network_raster
+                or not os.path.exists(sFilename_river_network_raster)
+            ) and os.path.exists(sFilename_flowline_out):
+                target_raster = os.path.join(
+                    sWorkspace_river_network_output, "river_network_raster.tif"
+                )
+                logger.info(
+                    "Rasterizing provided river network vector to: %s", target_raster
+                )
+                try:
+                    convert_vector_to_global_raster(
+                        sFilename_flowline_out,
+                        target_raster,
+                        dResolution_x_in,
+                        dResolution_y_in,
+                    )
+                    sFilename_river_network_raster = target_raster
+                except Exception as e:
+                    logger.warning("Could not auto-rasterize river network: %s", e)
+        elif sFilename_flowline_raw_in and os.path.exists(sFilename_flowline_raw_in):
+            logger.info(
+                "Using raw river network directly without simplification: %s",
+                sFilename_flowline_raw_in,
+            )
+            sFilename_flowline_out = sFilename_flowline_raw_in
+            target_raster = os.path.join(
+                sWorkspace_river_network_output, "river_network_raster.tif"
+            )
+            if not os.path.exists(target_raster):
+                logger.info("Rasterizing river network vector to: %s", target_raster)
+                try:
+                    convert_vector_to_global_raster(
+                        sFilename_flowline_out,
+                        target_raster,
+                        dResolution_x_in,
+                        dResolution_y_in,
+                    )
+                    sFilename_river_network_raster = target_raster
+                except Exception as e:
+                    logger.warning("Could not auto-rasterize river network: %s", e)
 
         # -------------------------------------------------------------------
         # 2. Coastline & Land-Ocean Mask Preprocessing
@@ -211,17 +312,30 @@ class ULRMWorkflow:
             aFilename_flowline = []
             for i in range(1, nOutlet_largest + 1):
                 sBasin_id = f"{i:04d}"
-                sFilename_flowline_basin = os.path.join(
-                    sWorkspace_river_network_output,
-                    f"HydroRIVERS_v10_simplified_{sDistance_tolerance}_{sDrainage_area_threshold}_{sBasin_id}.geojson",
+                sFilename_flowline_basin = sFilename_flowline_out.replace(
+                    ".geojson", f"_{sBasin_id}.geojson"
                 )
+                if not os.path.exists(sFilename_flowline_basin):
+                    legacy_basin = os.path.join(
+                        sWorkspace_river_network_output,
+                        f"HydroRIVERS_v10_simplified_{sDistance_tolerance}_{sDrainage_area_threshold}_{sBasin_id}.geojson",
+                    )
+                    if os.path.exists(legacy_basin):
+                        sFilename_flowline_basin = legacy_basin
+                    else:
+                        candidates = glob.glob(
+                            os.path.join(
+                                sWorkspace_river_network_output,
+                                f"*_{sBasin_id}.geojson",
+                            )
+                        )
+                        if candidates:
+                            sFilename_flowline_basin = candidates[0]
                 if os.path.exists(sFilename_flowline_basin):
                     aFilename_flowline.append(sFilename_flowline_basin)
 
-            if not aFilename_flowline and os.path.exists(
-                sFilename_flowline_hydrosheds_out
-            ):
-                aFilename_flowline.append(sFilename_flowline_hydrosheds_out)
+            if not aFilename_flowline and os.path.exists(sFilename_flowline_out):
+                aFilename_flowline.append(sFilename_flowline_out)
 
             if aFilename_flowline and os.path.exists(sFilename_vector_coastline):
                 logger.info(
@@ -270,7 +384,8 @@ class ULRMWorkflow:
             sFilename_vector_coastline_merged = paths.get("coastline_vector", "")
 
         self.preprocessed_paths = {
-            "river_network_vector": sFilename_flowline_hydrosheds_out,
+            "river_network_raw": sFilename_flowline_raw_in,
+            "river_network_vector": sFilename_flowline_out,
             "river_network_raster": sFilename_river_network_raster,
             "coastline_raster": sFilename_tif_wo_island,
             "coastline_vector": sFilename_vector_coastline_merged,

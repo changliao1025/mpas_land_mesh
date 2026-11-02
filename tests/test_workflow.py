@@ -250,6 +250,72 @@ class TestULRMWorkflow(unittest.TestCase):
         mock_coastline.assert_called_once()
         self.assertIsNotNone(paths)
 
+    @patch("mpas_land_mesh.workflow.simplify_river_network")
+    @patch("mpas_land_mesh.workflow.convert_vector_to_global_raster")
+    def test_preprocess_general_raw_river_network(
+        self,
+        mock_rasterize,
+        mock_simplify,
+    ):
+        """Verify general non-HydroRIVERS river network preprocessing with column mappings."""
+        raw_river_file = self.base_dir / "input" / "nhdplus_flowlines.gpkg"
+        raw_river_file.parent.mkdir(parents=True, exist_ok=True)
+        raw_river_file.touch()
+
+        cfg = dict(self.sample_config)
+        cfg["preprocessing"] = {
+            "simplify_rivers": True,
+            "process_coastline": False,
+            "largest_outlets": 3,
+            "col_id": "COMID",
+            "col_drainage_area": "TotDASqKM",
+            "col_main_riv": "GNIS_ID",
+            "col_stream_order": "StreamOrde",
+            "col_next_down": "NextDownID",
+            "drainage_area_unit_multiplier": 1.0e6,
+        }
+        cfg["paths"]["river_network_raw"] = str(raw_river_file)
+        cfg["paths"]["hydrosheds_rivers"] = ""
+
+        wf = ULRMWorkflow(cfg)
+        paths = wf.preprocess()
+
+        mock_simplify.assert_called_once()
+        call_kwargs = mock_simplify.call_args.kwargs
+        self.assertEqual(
+            call_kwargs["sFilename_flowline_hydroshed_in"], str(raw_river_file)
+        )
+        self.assertIn(
+            "nhdplus_flowlines_simplified_",
+            call_kwargs["sFilename_flowline_hydroshed_out"],
+        )
+        self.assertEqual(call_kwargs["sCol_id"], "COMID")
+        self.assertEqual(call_kwargs["sCol_drainage_area"], "TotDASqKM")
+        self.assertEqual(call_kwargs["sCol_main_riv"], "GNIS_ID")
+        self.assertEqual(call_kwargs["sCol_stream_order"], "StreamOrde")
+        self.assertEqual(call_kwargs["sCol_next_down"], "NextDownID")
+        self.assertEqual(call_kwargs["dDrainage_area_multiplier"], 1.0e6)
+        self.assertIn("nhdplus_flowlines_simplified_", paths["river_network_vector"])
+
+    @patch("mpas_land_mesh.workflow.convert_vector_to_global_raster")
+    def test_preprocess_auto_rasterize_vector_when_no_raster(self, mock_rasterize):
+        """Verify vector is auto-rasterized when raster does not exist and simplify is False."""
+        river_vec = self.base_dir / "custom_river.geojson"
+        river_vec.touch()
+
+        cfg = dict(self.sample_config)
+        cfg["preprocessing"] = {"simplify_rivers": False, "process_coastline": False}
+        cfg["paths"]["river_network_vector"] = str(river_vec)
+        cfg["paths"]["river_network_raster"] = ""
+
+        wf = ULRMWorkflow(cfg)
+        paths = wf.preprocess()
+
+        mock_rasterize.assert_called_once()
+        self.assertTrue(
+            paths["river_network_raster"].endswith("river_network_raster.tif")
+        )
+
     def test_compile_mesh_ready_config(self):
         """Verify compile_mesh_ready_config produces valid pyearthmesh config dict and file."""
         wf = ULRMWorkflow(self.sample_config)

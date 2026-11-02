@@ -4,17 +4,17 @@
     "mesh_type": "mpas",
     "case_index": 1,
     "model": "jigsaw",
-    "simplify_hydrosheds_river_network": false,
-    "process_coastline": false,
+    "simplify_hydrosheds_river_network": true,
+    "process_coastline": true,
     "debug": true,
-    "largest_outlets": 10,
+    "largest_outlets": 1,
     "run_on_hpc": false
   },
   "resolutions": {
     "ocean_km": 100,
-    "land_km": 12.5,
-    "river_network_km": 5,
-    "coastline_km": 10,
+    "land_km": 8.0,
+    "river_network_km": 3,
+    "coastline_km": 3,
     "lake_boundary_km": 3,
     "watershed_boundary_km": 3
   },
