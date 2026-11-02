@@ -54,6 +54,9 @@ DEFAULT_ULRM_CONFIG: dict[str, Any] = {
     "paths": {
         "input_workspace": "./input",
         "output_workspace": "./output",
+        "boundary_file": "",
+        "mesh_boundary": "",
+        "boundary_vector": "",
         "river_network_raw": "",
         "hydrosheds_rivers": "",  # legacy alias for river_network_raw
         "region_geometry": "",

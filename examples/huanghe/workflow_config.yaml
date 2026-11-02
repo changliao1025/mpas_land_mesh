@@ -8,7 +8,7 @@
 
 # High-level workflow orchestration and execution targets
 workflow:
-  date: "20260801"                                # Run date (YYYYMMDD)
+  date: "20261101"                                # Run date (YYYYMMDD)
   mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
   case_index: 1                                   # Case index number
   model: jigsaw                                   # Core mesh generation backend

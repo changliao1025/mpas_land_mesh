@@ -366,6 +366,12 @@ class TestULRMWorkflow(unittest.TestCase):
             str(self.base_dir / "watershed.tif"),
         )
 
+        # Watershed boundary is set as boundary_file for MPAS mesh cropping
+        self.assertEqual(
+            paths.get("boundary_file"),
+            str(self.base_dir / "watershed.geojson"),
+        )
+
         # Lake boundary disabled for both geom and spac
         self.assertNotIn("lake_boundary_vector", paths)
         self.assertNotIn("lake_boundary_raster", paths)

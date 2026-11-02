@@ -564,7 +564,18 @@ class ULRMWorkflow:
             if p:
                 compiled_paths["city_raster"] = p
 
-        # 7. Region geometry and optional output mesh
+        # 7. Boundary file for cropping the MPAS NetCDF mesh
+        # Priority: boundary_file / mesh_boundary -> watershed_boundary_vector
+        boundary_file = (
+            _get_path("boundary_file")
+            or _get_path("mesh_boundary")
+            or _get_path("boundary_vector")
+            or _get_path("watershed_boundary_vector")
+        )
+        if boundary_file:
+            compiled_paths["boundary_file"] = boundary_file
+
+        # 8. Region geometry and optional output mesh
         if raw_paths.get("region_geometry"):
             compiled_paths["region_geometry"] = _get_path("region_geometry")
         if raw_paths.get("output_mesh"):
