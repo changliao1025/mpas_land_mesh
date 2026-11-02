@@ -366,9 +366,9 @@ class TestULRMWorkflow(unittest.TestCase):
             str(self.base_dir / "watershed.tif"),
         )
 
-        # Watershed boundary is set as boundary_file for MPAS mesh cropping
+        # Watershed boundary is set as mesh_boundary_file for MPAS mesh cropping
         self.assertEqual(
-            paths.get("boundary_file"),
+            paths.get("mesh_boundary_file"),
             str(self.base_dir / "watershed.geojson"),
         )
 
