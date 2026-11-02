@@ -61,7 +61,12 @@
       "Windows": "D:/data/modeldata/hexwatershed/huanghe/raster/lake_boundary_mask.tif",
       "default": "./data/lake_boundary_mask.tif"
     },
-    "watershed_boundary_vector": "",
+    "watershed_boundary_vector": {
+      "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
+      "default": "./data/lake_boundary_hydrobasins_huanghe.geojson"
+    },
     "watershed_boundary_raster": {
       "Darwin": "/Users/changliao/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
       "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
@@ -86,7 +91,7 @@
   "jigsaw": {
     "standalone": true,
     "create_directory": true,
-    "hours": 3,
+    "hours": 10,
     "slurm": "cpu_single",
     "ncolumn_space": 3600,
     "nrow_space": 1800,
@@ -96,8 +101,8 @@
     "iFlag_spac_land": true,
     "iFlag_geom_river_network": true,
     "iFlag_spac_river_network": true,
-    "iFlag_geom_lake_boundary": true,
-    "iFlag_spac_lake_boundary": true,
+    "iFlag_geom_lake_boundary": false,
+    "iFlag_spac_lake_boundary": false,
     "iFlag_spac_watershed_boundary": true,
     "iFlag_spac_coastline": true
   }

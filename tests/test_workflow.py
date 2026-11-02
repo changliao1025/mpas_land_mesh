@@ -331,6 +331,49 @@ class TestULRMWorkflow(unittest.TestCase):
         saved_yaml = self.out_dir / "mesh_ready_workflow.yaml"
         self.assertTrue(saved_yaml.is_file())
 
+    def test_compile_mesh_ready_config_flag_filtering(self):
+        """Verify feature flags control vector and raster inclusion in mesh_ready config."""
+        cfg = dict(self.sample_config)
+        cfg["paths"] = dict(self.sample_config["paths"])
+        cfg["paths"]["watershed_boundary_vector"] = str(
+            self.base_dir / "watershed.geojson"
+        )
+        cfg["paths"]["watershed_boundary_raster"] = str(self.base_dir / "watershed.tif")
+        cfg["paths"]["lake_boundary_vector"] = str(self.base_dir / "lake.geojson")
+        cfg["paths"]["lake_boundary_raster"] = str(self.base_dir / "lake.tif")
+
+        cfg["jigsaw"] = {
+            "standalone": True,
+            "iFlag_geom": True,
+            "iFlag_spac": True,
+            "iFlag_geom_river_network": True,
+            "iFlag_spac_river_network": True,
+            "iFlag_geom_watershed_boundary": False,
+            "iFlag_spac_watershed_boundary": True,
+            "iFlag_geom_lake_boundary": False,
+            "iFlag_spac_lake_boundary": False,
+        }
+
+        wf = ULRMWorkflow(cfg)
+        mesh_ready = wf.compile_mesh_ready_config(save_yaml=True)
+        paths = mesh_ready["paths"]
+
+        # Watershed boundary raster enabled, vector disabled
+        self.assertIn("watershed_boundary_raster", paths)
+        self.assertNotIn("watershed_boundary_vector", paths)
+        self.assertEqual(
+            paths["watershed_boundary_raster"],
+            str(self.base_dir / "watershed.tif"),
+        )
+
+        # Lake boundary disabled for both geom and spac
+        self.assertNotIn("lake_boundary_vector", paths)
+        self.assertNotIn("lake_boundary_raster", paths)
+
+        # River network enabled for both
+        self.assertIn("river_network_vector", paths)
+        self.assertIn("river_network_raster", paths)
+
     @patch("mpas_land_mesh.workflow.create_workflow")
     def test_create_mesh_workflow(self, mock_create):
         """Verify create_mesh_workflow forwards compiled config to pyearthmesh."""

@@ -64,7 +64,11 @@ paths:
     Linux: /public/home/liaochang/data/hexwatershed/huanghe/raster/lake_boundary_mask.tif
     Windows: D:/data/modeldata/hexwatershed/huanghe/raster/lake_boundary_mask.tif
     default: ./data/lake_boundary_mask.tif
-  watershed_boundary_vector: ""
+  watershed_boundary_vector:
+    Darwin: /Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
+    Linux: /public/home/liaochang/data/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson
+    Windows: D:/data/modeldata/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson
+    default: ./data/lake_boundary_hydrobasins_huanghe.geojson
   watershed_boundary_raster:
     Darwin: /Users/changliao/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif
     Linux: /public/home/liaochang/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif
@@ -87,7 +91,7 @@ paths:
 jigsaw:
   standalone: true                                # Run standalone generator without external wrapper
   create_directory: true                          # Auto-create case subfolder in workspace
-  hours: 3                                        # SLURM walltime allocation (hours)
+  hours: 10                                        # SLURM walltime allocation (hours)
   slurm: cpu_single                               # SLURM partition or queue name
   ncolumn_space: 3600                             # Spacing raster longitudinal grid cells (0.1 deg)
   nrow_space: 1800                                # Spacing raster latitudinal grid cells (0.1 deg)
@@ -97,7 +101,7 @@ jigsaw:
   iFlag_spac_land: true                           # Apply land spacing constraint
   iFlag_geom_river_network: true                  # Enforce river network feature constraints
   iFlag_spac_river_network: true                  # Enforce river network resolution refinement
-  iFlag_geom_lake_boundary: true                  # Enforce lake boundary feature constraints
-  iFlag_spac_lake_boundary: true                  # Enforce lake boundary resolution refinement
+  iFlag_geom_lake_boundary: false                  # Enforce lake boundary feature constraints
+  iFlag_spac_lake_boundary: false                  # Enforce lake boundary resolution refinement
   iFlag_spac_watershed_boundary: true             # Refine watershed divide boundaries
   iFlag_spac_coastline: true                      # Refine coastline transition zone

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Union
 
 from hexwatershed_utility.preprocess.feature.coastline import (
-    create_land_ocean_mask_from_basins,
+    create_land_ocean_mask_from_hydrobasins,
     create_land_ocean_mask_from_naturalearth,
     create_land_ocean_mask_from_shoreline,
     extend_land_mask_to_rivers,
@@ -283,9 +283,9 @@ class ULRMWorkflow:
                         iRaster_buffer_pixel=iRaster_buffer_pixel,
                     )
                 )
-            elif mask_source == "basins":
+            elif mask_source in ("basins", "hydrobasins"):
                 sFilename_tif_wo_island, sFilename_vector_coastline = (
-                    create_land_ocean_mask_from_basins(
+                    create_land_ocean_mask_from_hydrobasins(
                         sWorkspace_output=sWorkspace_coastline_output,
                         sFolder_boundary_in=paths.get("basins_boundary"),
                         dResolution_x=dResolution_x_in,
@@ -400,6 +400,11 @@ class ULRMWorkflow:
     def compile_mesh_ready_config(self, save_yaml: bool = True) -> dict[str, Any]:
         """Compile a mesh-ready configuration dictionary for pyearthmesh.
 
+        Evaluates jigsaw flags (such as iFlag_geom_river_network, iFlag_spac_river_network,
+        iFlag_spac_watershed_boundary, iFlag_geom_lake_boundary, etc.) to determine
+        which preprocessed or direct user-provided vectors and rasters are included
+        in the mesh-ready specification.
+
         Parameters
         ----------
         save_yaml : bool, default=True
@@ -422,6 +427,149 @@ class ULRMWorkflow:
             "ncolumn_space", jigsaw_settings.get("ncolumn_space", 360)
         )
 
+        raw_paths = self.config.get("paths", {})
+
+        def _get_path(key: str) -> str:
+            val = self.preprocessed_paths.get(key)
+            if not val:
+                val = raw_paths.get(key, "")
+            return str(val) if val else ""
+
+        # Master JIGSAW flags
+        bGeom = bool(jigsaw_settings.get("iFlag_geom", True))
+        bSpac = bool(jigsaw_settings.get("iFlag_spac", True))
+
+        compiled_paths: dict[str, str] = {
+            "input_workspace": _get_path("input_workspace"),
+            "output_workspace": _get_path("output_workspace") or self.output_workspace,
+        }
+
+        # 1. River Network (preprocessed or direct)
+        flag_geom_river = bool(jigsaw_settings.get("iFlag_geom_river_network", True))
+        if bGeom and flag_geom_river:
+            p = _get_path("river_network_vector")
+            if p:
+                compiled_paths["river_network_vector"] = p
+            else:
+                logger.warning(
+                    "iFlag_geom_river_network is True but river_network_vector is not provided."
+                )
+
+        flag_spac_river = bool(jigsaw_settings.get("iFlag_spac_river_network", True))
+        if bSpac and flag_spac_river:
+            p = _get_path("river_network_raster")
+            if p:
+                compiled_paths["river_network_raster"] = p
+            else:
+                logger.warning(
+                    "iFlag_spac_river_network is True but river_network_raster is not provided."
+                )
+
+        # 2. Coastline (preprocessed or direct)
+        flag_geom_coast = bool(jigsaw_settings.get("iFlag_geom_coastline", False))
+        if bGeom and flag_geom_coast:
+            p = _get_path("coastline_vector")
+            if p:
+                compiled_paths["coastline_vector"] = p
+            else:
+                logger.warning(
+                    "iFlag_geom_coastline is True but coastline_vector is not provided."
+                )
+
+        flag_spac_coast = bool(
+            jigsaw_settings.get("iFlag_spac_coastline", False)
+            or jigsaw_settings.get("iFlag_spac_ocean", False)
+        )
+        if bSpac and flag_spac_coast:
+            p = _get_path("coastline_raster")
+            if p:
+                compiled_paths["coastline_raster"] = p
+            else:
+                logger.warning(
+                    "iFlag_spac_coastline/ocean is True but coastline_raster is not provided."
+                )
+
+        # 3. Watershed boundary (direct from original config paths)
+        flag_geom_wshed = bool(
+            jigsaw_settings.get("iFlag_geom_watershed_boundary", False)
+        )
+        if bGeom and flag_geom_wshed:
+            p = _get_path("watershed_boundary_vector")
+            if p:
+                compiled_paths["watershed_boundary_vector"] = p
+            else:
+                logger.warning(
+                    "iFlag_geom_watershed_boundary is True but watershed_boundary_vector is not provided."
+                )
+
+        flag_spac_wshed = bool(
+            jigsaw_settings.get("iFlag_spac_watershed_boundary", False)
+        )
+        if bSpac and flag_spac_wshed:
+            p = _get_path("watershed_boundary_raster")
+            if p:
+                compiled_paths["watershed_boundary_raster"] = p
+            else:
+                logger.warning(
+                    "iFlag_spac_watershed_boundary is True but watershed_boundary_raster is not provided."
+                )
+
+        # 4. Lake boundary (direct from original config paths)
+        flag_geom_lake = bool(jigsaw_settings.get("iFlag_geom_lake_boundary", False))
+        if bGeom and flag_geom_lake:
+            p = _get_path("lake_boundary_vector")
+            if p:
+                compiled_paths["lake_boundary_vector"] = p
+            else:
+                logger.warning(
+                    "iFlag_geom_lake_boundary is True but lake_boundary_vector is not provided."
+                )
+
+        flag_spac_lake = bool(jigsaw_settings.get("iFlag_spac_lake_boundary", False))
+        if bSpac and flag_spac_lake:
+            p = _get_path("lake_boundary_raster")
+            if p:
+                compiled_paths["lake_boundary_raster"] = p
+            else:
+                logger.warning(
+                    "iFlag_spac_lake_boundary is True but lake_boundary_raster is not provided."
+                )
+
+        # 5. Dam (direct from original config paths)
+        flag_geom_dam = bool(jigsaw_settings.get("iFlag_geom_dam", False))
+        if (bGeom and flag_geom_dam) or (
+            raw_paths.get("dam_vector")
+            and jigsaw_settings.get("iFlag_geom_dam") is not False
+        ):
+            p = _get_path("dam_vector")
+            if p:
+                compiled_paths["dam_vector"] = p
+
+        flag_spac_dam = bool(jigsaw_settings.get("iFlag_spac_dam", False))
+        if bSpac and flag_spac_dam:
+            p = _get_path("dam_raster")
+            if p:
+                compiled_paths["dam_raster"] = p
+
+        # 6. City (direct from original config paths)
+        flag_geom_city = bool(jigsaw_settings.get("iFlag_geom_city", False))
+        if bGeom and flag_geom_city:
+            p = _get_path("city_vector")
+            if p:
+                compiled_paths["city_vector"] = p
+
+        flag_spac_city = bool(jigsaw_settings.get("iFlag_spac_city", False))
+        if bSpac and flag_spac_city:
+            p = _get_path("city_raster")
+            if p:
+                compiled_paths["city_raster"] = p
+
+        # 7. Region geometry and optional output mesh
+        if raw_paths.get("region_geometry"):
+            compiled_paths["region_geometry"] = _get_path("region_geometry")
+        if raw_paths.get("output_mesh"):
+            compiled_paths["output_mesh"] = _get_path("output_mesh")
+
         mesh_ready = {
             "workflow": {
                 "case_index": wf.get("case_index", 1),
@@ -432,20 +580,7 @@ class ULRMWorkflow:
                 "run_on_hpc": wf.get("run_on_hpc", False),
             },
             "resolutions": dict(self.config["resolutions"]),
-            "paths": {
-                "input_workspace": self.preprocessed_paths.get("input_workspace", ""),
-                "output_workspace": self.preprocessed_paths["output_workspace"],
-                "river_network_vector": self.preprocessed_paths.get(
-                    "river_network_vector", ""
-                ),
-                "river_network_raster": self.preprocessed_paths.get(
-                    "river_network_raster", ""
-                ),
-                "coastline_raster": self.preprocessed_paths.get("coastline_raster", ""),
-                "coastline_vector": self.preprocessed_paths.get("coastline_vector", ""),
-                "dam_vector": self.preprocessed_paths.get("dam_vector", ""),
-                "region_geometry": self.preprocessed_paths.get("region_geometry", ""),
-            },
+            "paths": compiled_paths,
             "jigsaw": jigsaw_settings,
         }
 
