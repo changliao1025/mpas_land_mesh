@@ -27,11 +27,13 @@ from pyearthmesh.config.config_manager import (
 )
 from pyearthmesh.config.workflows.mpas_workflow import MPASWorkflow
 
+from mpas_land_mesh.config import load_ulrm_config
 from mpas_land_mesh.utilities import DEFAULT_CONFIG as UTILS_DEFAULT_CONFIG
 from mpas_land_mesh.utilities import compile_workflow as utils_compile_workflow
 from mpas_land_mesh.utilities import create_workflow as utils_create_workflow
 from mpas_land_mesh.utilities import dump_workflow_config as utils_dump_workflow_config
 from mpas_land_mesh.utilities import load_workflow_config as utils_load_workflow_config
+from mpas_land_mesh.workflow import ULRMWorkflow
 
 
 class TestWorkflowConfig(unittest.TestCase):
@@ -188,7 +190,7 @@ jigsaw:
         cfg_path = self.base_dir / "paths.json"
         raw_data = {
             "paths": {
-                "hydrosheds_rivers": {
+                "river_network_vector": {
                     current_os: "./rivers_current.shp",
                     other_os: "/other/path/rivers.shp",
                     "default": "./default_rivers.shp",
@@ -205,7 +207,7 @@ jigsaw:
         expected_river = str((self.base_dir / "rivers_current.shp").resolve())
         expected_region = str((self.base_dir / "default_region.geojson").resolve())
 
-        self.assertEqual(config["paths"]["hydrosheds_rivers"], expected_river)
+        self.assertEqual(config["paths"]["river_network_vector"], expected_river)
         self.assertEqual(config["paths"]["region_geometry"], expected_region)
 
     def test_unknown_setting_raises_error(self):
@@ -353,11 +355,17 @@ jigsaw:
             self.assertTrue(yaml_path.exists(), f"Missing {yaml_path}")
             self.assertTrue(json_path.exists(), f"Missing {json_path}")
 
-            cfg_yaml = load_workflow_config(yaml_path)
-            cfg_json = load_workflow_config(json_path)
+            cfg_yaml = load_ulrm_config(yaml_path)
+            cfg_json = load_ulrm_config(json_path)
 
-            compiled_yaml = compile_workflow(cfg_yaml)
-            compiled_json = compile_workflow(cfg_json)
+            wf_yaml = ULRMWorkflow(cfg_yaml)
+            wf_json = ULRMWorkflow(cfg_json)
+
+            mesh_ready_yaml = wf_yaml.compile_mesh_ready_config(save_yaml=False)
+            mesh_ready_json = wf_json.compile_mesh_ready_config(save_yaml=False)
+
+            compiled_yaml = compile_workflow(mesh_ready_yaml)
+            compiled_json = compile_workflow(mesh_ready_json)
 
             # Both YAML and JSON should produce identical compiled keys and values
             # (ignoring sFilename_model_configuration which holds the specific file path)
