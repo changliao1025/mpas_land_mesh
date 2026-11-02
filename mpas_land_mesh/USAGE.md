@@ -2,208 +2,164 @@
 
 ## Overview
 
-The ULRM Workflow module provides a streamlined interface for creating unified land-river meshes without requiring the full dependency stack.
+The `mpas_land_mesh` package runs unified land-river mesh workflows for MPAS by integrating the specialized packages in the `pyearth` ecosystem:
+- **`pyearth`**: Foundational GIS, vector, raster, spatial reference, and geometry operations.
+- **`pyearthbuffer`**: Geodesic buffer operations on the WGS84 ellipsoid.
+- **`hexwatershed_utility`**: Preprocessing for river networks, flowline simplification, and coastline/mask generation.
+- **`pyearthmesh`**: Mesh generation (MPAS, JIGSAW) and unified YAML/JSON workflow configuration.
+- **`mpas_land_mesh`**: Domain constants, MPAS mesh statistics, and workflow execution.
 
-## Basic Usage
+---
 
-### 1. Import the Module
+## Key Modules & Imports
+
+### 1. Vector Operations (`pyearth`)
+
+Extract field attributes or merge vector features using `pyearth`:
 
 ```python
-from mpas_land_mesh.core import (
-    get_field_and_value,
+from pyearth.toolbox.management.vector.fields import (
     add_field_to_vector_file,
-    merge_features,
+    get_field_and_value,
+    get_field_value,
+)
+from pyearth.toolbox.management.vector.merge_features import merge_features
+
+# Extract fields and attribute dictionaries
+fields, values = get_field_and_value("boundary.geojson")
+print(f"Fields: {fields}")
+print(f"First feature attributes: {values[0] if values else None}")
+
+# Merge vector features into a single geometry
+merge_features("input.geojson", "merged_output.geojson")
+```
+
+### 2. Raster Operations (`pyearth`)
+
+Rasterize vectors and buffer raster masks:
+
+```python
+from pyearth.toolbox.analysis.image.raster_process import (
+    create_raster_buffer_zone,
+    fix_raster_antimeridian_issue,
+)
+from pyearth.toolbox.conversion.convert_vector_to_global_raster import (
     convert_vector_to_global_raster,
-    create_config_template
 )
 
+# Convert vector to global raster
+convert_vector_to_global_raster(
+    "coastline.geojson",
+    "coastline_raster.tif",
+    dResolution_x=0.1,  # degrees
+    dResolution_y=0.1,
+    iFlag_boundary_only_in=0,
+    dFill_value_in=2,
+)
+
+# Dilate/buffer raster mask
+create_raster_buffer_zone(
+    "coastline_raster.tif",
+    "coastline_buffered.tif",
+    iBuffer_value_in=2,
+    iBuffer_pixel_in=1,
+)
+```
+
+### 3. River Network Preprocessing (`hexwatershed_utility`)
+
+Simplify river networks and identify basin outlets:
+
+```python
 from hexwatershed_utility.preprocess.feature.river import (
     get_outlet_location,
-    simplify_river_network
+    simplify_river_network,
+    tag_river_outlet,
 )
-```
 
-### 2. Configuration Management
-
-#### Create Configuration File
-
-```python
-from mpas_land_mesh.core.config_utils import create_config_template
-
-config = create_config_template(
-    'workflow_config.json',
-    iCase_index=1,
-    sWorkspace_output='/path/to/output',
-    dResolution_ocean=18.0,
-    dResolution_land=12.0,
-    dResolution_coastline=6.0
-)
-```
-
-#### Modify Configuration
-
-```python
-from mpas_land_mesh.core.config_utils import change_json_key_value
-
-change_json_key_value(
-    'workflow_config.json',
-    'dResolution_ocean',
-    30.0
-)
-```
-
-### 3. Vector Operations
-
-#### Extract Fields
-
-```python
-from mpas_land_mesh.core.vector_utils import get_field_and_value
-
-fields, values = get_field_and_value('input.geojson')
-print(f"Fields: {fields}")
-print(f"Values: {values}")
-```
-
-#### Merge Features
-
-```python
-from mpas_land_mesh.core.vector_utils import merge_features
-
-merge_features(
-    'input.geojson',
-    'merged_output.geojson',
-    iFlag_force=True
-)
-```
-
-### 4. Raster Operations
-
-#### Convert Vector to Raster
-
-```python
-from mpas_land_mesh.core.raster_utils import convert_vector_to_global_raster
-
-convert_vector_to_global_raster(
-    'coastline.geojson',
-    'coastline_raster.tif',
-    dResolution_x_in=0.1,  # degrees
-    dResolution_y_in=0.1,
-    iFlag_boundary_only_in=1,
-    dFill_value_in=1
-)
-```
-
-#### Create Buffer Zone
-
-```python
-from mpas_land_mesh.core.raster_utils import create_raster_buffer_zone
-
-create_raster_buffer_zone(
-    'input.tif',
-    'buffered.tif',
-    iBuffer_value_in=2,
-    iFill_value_in=1
-)
-```
-
-### 5. River Network Processing
-
-#### Get Outlet Location
-
-```python
-from hexwatershed_utility.preprocess.feature.river import get_outlet_location
-
-longitude, latitude = get_outlet_location('river_network.geojson')
-print(f"Outlet at: {longitude}, {latitude}")
-```
-
-#### Simplify River Network
-
-```python
-from hexwatershed_utility.preprocess.feature.river import simplify_river_network
-
+# Simplify river network by distance tolerance and drainage area
 simplify_river_network(
-    'HydroRIVERS.shp',
-    'simplified.geojson',
-    dTolerance=1000.0,  # meters
-    dDrainage_threshold=1e8  # m²
+    sFilename_flowline_hydroshed_in="HydroRIVERS.shp",
+    sFilename_flowline_hydroshed_out="simplified_rivers.geojson",
+    dDistance_tolerance_in=10_000.0,  # meters
+    dDrainage_area_threshold_in=1e8,  # m²
+    nOutlet_largest=10,
 )
+
+# Get coordinates of river outlet
+lon, lat = get_outlet_location("simplified_rivers.geojson")
+print(f"River outlet at: {lon}, {lat}")
 ```
 
-## Complete Workflow Example
+### 4. Coastline & Land-Ocean Masking (`hexwatershed_utility`)
+
+Create land-ocean masks and reconcile river mouths:
 
 ```python
-import os
-from datetime import datetime
-from mpas_land_mesh.core.config_utils import (
-    create_config_template,
-    create_jigsaw_config_template
-)
-from mpas_land_mesh.core.vector_utils import merge_features
-from mpas_land_mesh.core.raster_utils import convert_vector_to_global_raster
-
-# Setup
-output_dir = './workflow_output'
-os.makedirs(output_dir, exist_ok=True)
-
-# Create configuration
-config = create_config_template(
-    os.path.join(output_dir, 'config.json'),
-    sDate=datetime.now().strftime('%Y%m%d'),
-    sWorkspace_output=output_dir,
-    dResolution_ocean=18.0,
-    dResolution_land=12.0
+from hexwatershed_utility.preprocess.feature.coastline import (
+    create_land_ocean_mask_from_naturalearth,
+    create_land_ocean_mask_from_shoreline,
+    extend_land_mask_to_rivers,
 )
 
-jigsaw_config = create_jigsaw_config_template(
-    os.path.join(output_dir, 'jigsaw_config.json'),
-    dResolution_ocean=18.0,
-    dResolution_land=12.0
+# Generate land-ocean mask from Natural Earth
+sRaster_mask, sVector_mask = create_land_ocean_mask_from_naturalearth(
+    sWorkspace_coastline_output="./output_coastline",
+    dResolution_x_in=30 / 3600.0,
+    dResolution_y_in=30 / 3600.0,
+    dThreshold_area_island=1000.0,  # km²
+    iRaster_buffer_pixel=1,
 )
 
-print(f"Configuration created in: {output_dir}")
-
-# Process data (if you have input files)
-# merge_features('input1.geojson', 'merged.geojson')
-# convert_vector_to_global_raster('merged.geojson', 'raster.tif', 0.1, 0.1)
+# Reconcile protruding river mouths with land boundary
+extend_land_mask_to_rivers(
+    aFilename_flowlines=["simplified_rivers.geojson"],
+    sFilename_vector_land=sVector_mask,
+    sFilename_vector_land_updated="./output_coastline/land_ocean_mask_updated.geojson",
+)
 ```
 
-## Limitations of Minimal Module
+### 5. Mesh Statistics & Constants (`mpas_land_mesh`)
 
-This minimal module provides **configuration and basic utilities** but has placeholders for:
+Inspect generated MPAS NetCDF mesh files and use standard constants:
 
-1. **River network simplification** - Basic implementation provided; use `hexwatershed_utility` for production
-2. **Coastline processing** - Requires Natural Earth data and full `hexwatershed_utility`
-3. **Watershed boundary extraction** - Requires HydroBasins data and full `hexwatershed_utility`
-4. **Mesh generation** - Requires `pyflowline` and JIGSAW
+```python
+from mpas_land_mesh.utilities.constants import (
+    DRAINAGE_AREA_MULTIPLIER,
+    ISLAND_AREA_MULTIPLIER,
+    KM2_TO_M2,
+    earth_radius,
+)
+from mpas_land_mesh.utilities.mesh_stats import get_mesh_stats
 
-## Migration to Full Workflow
-
-When ready for production, install full dependencies:
-
-```bash
-pip install hexwatershed_utility pyflowline pyhexwatershed
+# Read statistics from an MPAS NetCDF mesh
+stats = get_mesh_stats("mpas_mesh.nc")
+print(f"Cells: {stats['nCells']}")
+print(f"Min cell resolution: {stats['dLength_min']:.2f} m")
+print(f"Max cell resolution: {stats['dLength_max']:.2f} m")
 ```
 
-Then use the original workflow scripts in [`examples/global/`](../../examples/global/).
+### 6. Workflow Configuration & Execution (`pyearthmesh`)
 
-## API Reference
+Load, mutate, and compile workflow configurations:
 
-### Core Utilities
+```python
+from pyearthmesh.config.config_manager import (
+    DEFAULT_CONFIG,
+    compile_workflow,
+    create_workflow,
+    dump_workflow_config,
+    load_workflow_config,
+)
 
-- [`vector_utils.py`](core/vector_utils.py) - Vector file operations
-- [`raster_utils.py`](core/raster_utils.py) - Raster processing
-- [`config_utils.py`](core/config_utils.py) - Configuration management
+# Load YAML/JSON workflow
+config = load_workflow_config("workflow_config.yaml")
 
-### Preprocessing
-
-Preprocessing is provided directly by `hexwatershed_utility`:
-- `hexwatershed_utility.preprocess.feature.river` - River network processing
-- `hexwatershed_utility.preprocess.feature.coastline` - Coastline and land-ocean mask processing
-
-## Support
-
-For issues or questions:
-1. Check the main project documentation
-2. Review example workflows in [`examples/`](examples/)
-3. Consult the original workflow files for comparison
+# Instantiate workflow engine
+workflow = create_workflow(config)
+if workflow.run_on_hpc:
+    workflow.create_hpc_job(hours=5)
+else:
+    workflow.setup()
+    workflow.run()
+```

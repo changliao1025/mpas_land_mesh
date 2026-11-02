@@ -59,45 +59,51 @@ from pyflowline.configuration.config_manager import create_jigsaw_template_confi
 from pyflowline.configuration.change_json_key_value import change_json_key_value
 ```
 
-### Minimal Module Equivalents
+### Modern Ecosystem Module Equivalents
 
 ```python
-# Minimal module imports
-from mpas_land_mesh.core.vector_utils import (
-    get_field_and_value,           # ✅ Full implementation
-    add_field_to_vector_file,      # ✅ Full implementation
-    write_wkt_to_vector_file,      # ✅ Full implementation
-    merge_features                  # ✅ Full implementation
+# Vector operations (pyearth)
+from pyearth.toolbox.management.vector.fields import (
+    get_field_and_value,
+    add_field_to_vector_file,
+)
+from pyearth.toolbox.management.vector.merge_features import merge_features
+
+# Raster operations (pyearth)
+from pyearth.toolbox.conversion.convert_vector_to_global_raster import (
+    convert_vector_to_global_raster,
+)
+from pyearth.toolbox.analysis.image.raster_process import (
+    create_raster_buffer_zone,
+    fix_raster_antimeridian_issue,
 )
 
-from mpas_land_mesh.core.raster_utils import (
-    convert_vector_to_global_raster,     # ✅ Full implementation
-    create_raster_buffer_zone,           # ✅ Full implementation
-    fix_raster_antimeridian_issue        # ✅ Full implementation
+# Workflow configuration (pyearthmesh)
+from pyearthmesh.config.config_manager import (
+    create_workflow,
+    load_workflow_config,
+    dump_workflow_config,
+    compile_workflow,
+)
+from pyearthmesh.utility.change_json_key_value import change_json_key_value
+
+# River network preprocessing (hexwatershed_utility)
+from hexwatershed_utility.preprocess.feature.river import (
+    get_outlet_location,
+    simplify_river_network,
+    tag_river_outlet,
 )
 
-from mpas_land_mesh.core.config_utils import (
-    create_config_template,              # ✅ Full implementation
-    create_jigsaw_config_template,       # ✅ Full implementation
-    change_json_key_value,               # ✅ Full implementation
-    read_config_file                     # ✅ Full implementation
+# Coastline & land-ocean mask preprocessing (hexwatershed_utility)
+from hexwatershed_utility.preprocess.feature.coastline import (
+    create_land_ocean_mask_from_naturalearth,
+    create_land_ocean_mask_from_shoreline,
+    extend_land_mask_to_rivers,
 )
 
-from mpas_land_mesh.preprocessing.river_network import (
-    get_outlet_location,                 # ✅ Full implementation
-    simplify_river_network,              # ⚠️ Basic (Douglas-Peucker only)
-    tag_river_outlet                     # ❌ Placeholder
-)
-
-from mpas_land_mesh.preprocessing.coastline import (
-    create_land_ocean_mask,              # ❌ Placeholder
-    fix_coastline_river_incompatibility  # ❌ Placeholder
-)
-
-from mpas_land_mesh.preprocessing.watershed import (
-    find_watershed_boundary,             # ❌ Placeholder
-    extract_basin_boundary               # ✅ Simple bbox implementation
-)
+# Mesh statistics & constants (mpas_land_mesh)
+from mpas_land_mesh.utilities.mesh_stats import get_mesh_stats
+from mpas_land_mesh.utilities.constants import KM2_TO_M2, earth_radius
 
 # Not included in minimal module (need full packages):
 # - simplify_hydrorivers_networks (complex algorithm)
@@ -142,26 +148,23 @@ from mpas_land_mesh.preprocessing.watershed import (
 ### Path 1: Start Minimal, Upgrade Later
 
 ```python
-# Phase 1: Use minimal module for setup
-from mpas_land_mesh.core.config_utils import create_config_template
-config = create_config_template('config.json', ...)
+# Create or load unified workflow
+from pyearthmesh.config.config_manager import create_workflow, load_workflow_config
+workflow = create_workflow('workflow_config.yaml')
 
-# Phase 2: When ready, install full packages
-# pip install hexwatershed_utility pyflowline
-
-# Phase 3: Replace placeholders with full implementations
-from hexwatershed_utility.preprocess.features.rivers import simplify_hydrorivers_networks
+# Preprocessing with hexwatershed_utility
+from hexwatershed_utility.preprocess.feature.river import simplify_river_network
 # Now use full functionality
 ```
 
-### Path 2: Hybrid Approach
+### Path 2: Modular Approach
 
 ```python
-# Use minimal module for utilities
-from mpas_land_mesh.core.vector_utils import merge_features
+# Use pyearth for vector operations
+from pyearth.toolbox.management.vector.merge_features import merge_features
 
-# Use full packages for preprocessing
-from hexwatershed_utility.preprocess.features.coastline import create_land_ocean_mask_from_naturalearth
+# Use hexwatershed_utility for preprocessing
+from hexwatershed_utility.preprocess.feature.coastline import create_land_ocean_mask_from_naturalearth
 
 # Best of both worlds!
 ```
@@ -198,23 +201,22 @@ change_json_key_value('config.json', 'resolution', 18.0)
 ### Migrated to Minimal Module
 
 ```python
-from mpas_land_mesh.core.vector_utils import get_field_and_value
-from mpas_land_mesh.preprocessing.river_network import simplify_river_network
-from mpas_land_mesh.core.config_utils import change_json_key_value
+from pyearth.toolbox.management.vector.fields import get_field_and_value
+from hexwatershed_utility.preprocess.feature.river import simplify_river_network
+from pyearthmesh.utility.change_json_key_value import change_json_key_value
 
-# Get fields - same as before
+# Get fields
 fields, values = get_field_and_value('input.geojson')
 
-# Simplify river network - basic implementation
+# Simplify river network
 simplify_river_network(
     'rivers_in.shp',
     'rivers_out.geojson',
-    dTolerance=1000,
-    dDrainage_threshold=1e8
+    dDistance_tolerance_in=1000.0,
+    dDrainage_area_threshold_in=1e8,
 )
-# Note: nOutlet_largest parameter not supported in basic version
 
-# Update config - same as before
+# Update config
 change_json_key_value('config.json', 'resolution', 18.0)
 ```
 
