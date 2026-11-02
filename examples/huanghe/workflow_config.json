@@ -61,11 +61,17 @@
       "Windows": "D:/data/modeldata/hexwatershed/huanghe/raster/lake_boundary_mask.tif",
       "default": "./data/lake_boundary_mask.tif"
     },
+    "mesh_boundary_file": {
+      "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "default": "./data/merged.geojson"
+    },
     "watershed_boundary_vector": {
       "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
-      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
-      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/lake_boundary_hydrobasins_huanghe.geojson",
-      "default": "./data/lake_boundary_hydrobasins_huanghe.geojson"
+      "Linux": "/public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "default": "./data/merged.geojson"
     },
     "watershed_boundary_raster": {
       "Darwin": "/Users/changliao/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif",
