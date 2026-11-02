@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""
-Yellow River (Huanghe) MPAS mesh workflow (config-driven workflow).
+"""Yellow River (Huanghe) MPAS mesh workflow.
 
-A single sectioned YAML file (``workflow_config.yaml``) is the one and only source
-of truth. It is loaded by ``create_workflow``, which selects the per-mesh-type
-workflow class (``MPASWorkflow``) and builds the underlying ``mpascase`` in memory.
-
-The example then either runs mesh generation directly or generates HPC (SLURM) job
-scripts, depending on ``workflow.run_on_hpc``.
+This example demonstrates using mpas_land_mesh's ULRMWorkflow to orchestrate
+preprocessing and mesh generation from a single YAML/JSON configuration.
 """
 
 import argparse
+import logging
 import os
 from pathlib import Path
 
-from pyearthmesh.config.config_manager import create_workflow
+from mpas_land_mesh import ULRMWorkflow
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -25,9 +28,14 @@ def main() -> None:
         default=None,
         help="Path to workflow YAML/JSON configuration file (default: workflow_config.yaml)",
     )
+    parser.add_argument(
+        "--preprocess-only",
+        action="store_true",
+        help="Run only the preprocessing step and compile mesh_ready_workflow.yaml",
+    )
     args = parser.parse_args()
 
-    # ── Step 1 & 2: Build the workflow from configuration ─────────────────────
+    # ── Step 1: Resolve configuration path ────────────────────────────────────
     if args.config:
         sFilename_workflow = Path(args.config).expanduser().resolve()
     else:
@@ -35,38 +43,40 @@ def main() -> None:
         if not sFilename_workflow.exists():
             sFilename_workflow = Path(__file__).with_name("workflow_config.json")
 
-    print("Step 1: Loading workflow configuration...")
-    print(f"   * {sFilename_workflow}")
+    logger.info("Step 1: Initializing ULRM workflow from: %s", sFilename_workflow)
+    workflow = ULRMWorkflow(sFilename_workflow)
 
-    print("\nStep 2: Creating workflow object...")
-    oWorkflow = create_workflow(sFilename_workflow)
-    print(f"   * Mesh type:         {oWorkflow.workflow.get('mesh_type', 'mpas')}")
-    print(f"   * Output workspace:  {oWorkflow.output_workspace}")
-    print(f"   * Mesh output file:  {oWorkflow.mesh_file}")
+    # ── Step 2: Preprocessing & Mesh-Ready Compilation ───────────────────────
+    logger.info("Step 2: Preprocessing datasets...")
+    preprocessed = workflow.preprocess()
+    logger.info("   * Output workspace: %s", workflow.output_workspace)
 
-    # ── Step 3: Execute (mode + HPC settings come from the config) ────────────
-    if oWorkflow.workflow.get("run_on_hpc"):
-        print("\nStep 3 (HPC): Creating SLURM job scripts...")
-        oWorkflow.create_hpc_job()
-        print(f"   * run_mpas.py  written to: {oWorkflow.output_workspace}")
-        print(f"   * submit.job   written to: {oWorkflow.output_workspace}")
-        print(
-            f"   * Submit with: sbatch {os.path.join(oWorkflow.output_workspace, 'submit.job')}"
-        )
+    logger.info("Step 3: Compiling mesh-ready configuration...")
+    mesh_ready_cfg = workflow.compile_mesh_ready_config()
+    mesh_ready_file = os.path.join(
+        workflow.output_workspace, "mesh_ready_workflow.yaml"
+    )
+    logger.info("   * Mesh-ready specification written to: %s", mesh_ready_file)
+
+    if args.preprocess_only:
+        logger.info("Preprocess-only flag specified; halting before mesh generation.")
+        return
+
+    # ── Step 3: Run Mesh Generation or HPC Batch Script Generation ───────────
+    logger.info("Step 4: Executing mesh workflow via pyearthmesh...")
+    mesh_workflow = workflow.create_mesh_workflow()
+    if workflow.config["workflow"].get("run_on_hpc"):
+        hours = workflow.config.get("jigsaw", {}).get("hours", 5)
+        logger.info("Generating HPC SLURM job scripts (walltime=%dh)...", hours)
+        mesh_workflow.create_hpc_job(hours=hours)
+        logger.info("SLURM job scripts created in: %s", mesh_workflow.output_workspace)
     else:
-        print("\nStep 3 (local): Setting up MPAS workspace...")
-        oWorkflow.setup()
+        logger.info("Setting up MPAS workspace...")
+        mesh_workflow.setup()
+        logger.info("Running MPAS mesh generation...")
+        mesh_workflow.run()
 
-        print("\nStep 4 (local): Running MPAS mesh generation...")
-        aMpas = oWorkflow.run()
-
-        if aMpas is not None:
-            print(f"   * MPAS mesh created: {len(aMpas):d} cells")
-            print(f"   * GeoJSON saved to: {oWorkflow.mesh_file}")
-        else:
-            print("   * Mesh generation did not produce output.")
-
-    print("\nDone.")
+    logger.info("Done.")
 
 
 if __name__ == "__main__":
