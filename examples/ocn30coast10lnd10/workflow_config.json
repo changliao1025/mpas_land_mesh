@@ -29,7 +29,7 @@
       "Darwin": "/Users/changliao/scratch/earthmesh/ocn30coast10lnd10",
       "default": "./output"
     },
-    "hydrosheds_rivers": {
+    "river_network_raw": {
       "Windows": "./input/HydroRIVERS_v10.shp",
       "Linux": "/compyfs/liao313/00raw/hydrology/hydrosheds/hydroriver/HydroRIVERS_v10_shp/HydroRIVERS_v10_shp/HydroRIVERS_v10.shp",
       "Darwin": "./input/HydroRIVERS_v10.shp",

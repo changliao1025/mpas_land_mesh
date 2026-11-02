@@ -114,7 +114,6 @@ class ULRMWorkflow:
         sFilename_flowline_raw_in = (
             paths.get("river_network_raw")
             or paths.get("raw_rivers")
-            or paths.get("raw_river_network")
             or paths.get("hydrosheds_rivers")
             or ""
         )

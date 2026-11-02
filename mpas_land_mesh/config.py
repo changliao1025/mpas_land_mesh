@@ -183,14 +183,14 @@ def load_ulrm_config(
     # Resolve paths (multi-platform OS dictionaries & relative paths)
     if "paths" in config:
         config["paths"] = _resolve_paths(config["paths"], base_dir)
-        if config["paths"].get("river_network_raw") and not config["paths"].get(
-            "hydrosheds_rivers"
-        ):
-            config["paths"]["hydrosheds_rivers"] = config["paths"]["river_network_raw"]
-        elif config["paths"].get("hydrosheds_rivers") and not config["paths"].get(
-            "river_network_raw"
-        ):
-            config["paths"]["river_network_raw"] = config["paths"]["hydrosheds_rivers"]
+        raw_river_path = (
+            config["paths"].get("river_network_raw")
+            or config["paths"].get("hydrosheds_rivers")
+            or ""
+        )
+        if raw_river_path:
+            config["paths"]["river_network_raw"] = raw_river_path
+            config["paths"]["hydrosheds_rivers"] = raw_river_path
 
     return config
 

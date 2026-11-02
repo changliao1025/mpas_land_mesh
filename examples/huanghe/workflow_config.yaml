@@ -39,7 +39,7 @@ paths:
     Linux: /data2/share/liaochang/04model/jigsaw/huanghe
     Windows: D:/scratch/04model/jigsaw/huanghe
     default: ./output
-  hydrosheds_rivers:
+  river_network_raw:
     Darwin: /Users/changliao/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
     Linux: /public/home/liaochang/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
     Windows: D:/data/modeldata/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
