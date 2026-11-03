@@ -339,6 +339,9 @@ class TestULRMWorkflow(unittest.TestCase):
             self.base_dir / "watershed.geojson"
         )
         cfg["paths"]["watershed_boundary_raster"] = str(self.base_dir / "watershed.tif")
+        cfg["paths"]["mesh_boundary_file"] = str(
+            self.base_dir / "domain_boundary.geojson"
+        )
         cfg["paths"]["lake_boundary_vector"] = str(self.base_dir / "lake.geojson")
         cfg["paths"]["lake_boundary_raster"] = str(self.base_dir / "lake.tif")
 
@@ -366,8 +369,12 @@ class TestULRMWorkflow(unittest.TestCase):
             str(self.base_dir / "watershed.tif"),
         )
 
-        # Watershed boundary is set as mesh_boundary_file for MPAS mesh cropping
+        # Mesh boundary file is distinct from watershed boundary
         self.assertEqual(
+            paths.get("mesh_boundary_file"),
+            str(self.base_dir / "domain_boundary.geojson"),
+        )
+        self.assertNotEqual(
             paths.get("mesh_boundary_file"),
             str(self.base_dir / "watershed.geojson"),
         )
@@ -421,6 +428,50 @@ class TestULRMWorkflow(unittest.TestCase):
         mock_instance.create_hpc_job.assert_called_once_with(hours=5)
         mock_instance.setup.assert_not_called()
         mock_instance.run.assert_not_called()
+
+    @patch("mpas_land_mesh.workflow.convert_vector_to_global_raster")
+    def test_preprocess_watershed_boundary(self, mock_rasterize):
+        """Verify watershed boundary vector is rasterized and distinct from mesh boundary file."""
+        wshed_vec = self.base_dir / "watershed.geojson"
+        wshed_vec.touch()
+        mesh_bound = self.base_dir / "mesh_boundary.geojson"
+        mesh_bound.touch()
+
+        cfg = dict(self.sample_config)
+        cfg["workflow"] = {
+            "case_index": 3,
+            "process_river_network": False,
+            "process_coastline": False,
+            "process_watershed_boundary": True,
+        }
+        cfg["paths"]["watershed_boundary_vector"] = str(wshed_vec)
+        cfg["paths"]["watershed_boundary_raster"] = ""
+        cfg["paths"]["mesh_boundary_file"] = str(mesh_bound)
+        cfg["jigsaw"] = {
+            "iFlag_geom": True,
+            "iFlag_spac": True,
+            "iFlag_spac_watershed_boundary": True,
+        }
+
+        wf = ULRMWorkflow(cfg)
+        paths = wf.preprocess()
+
+        mock_rasterize.assert_called_once()
+        call_args = mock_rasterize.call_args[0]
+        self.assertEqual(call_args[0], str(wshed_vec))
+        self.assertTrue(
+            paths["watershed_boundary_raster"].endswith("watershed_boundary_raster.tif")
+        )
+        self.assertEqual(paths["watershed_boundary_vector"], str(wshed_vec))
+        self.assertEqual(paths["mesh_boundary_file"], str(mesh_bound))
+
+        mesh_ready = wf.compile_mesh_ready_config(save_yaml=False)
+        self.assertEqual(
+            mesh_ready["paths"]["watershed_boundary_raster"],
+            paths["watershed_boundary_raster"],
+        )
+        self.assertEqual(mesh_ready["paths"]["mesh_boundary_file"], str(mesh_bound))
+        self.assertNotEqual(mesh_ready["paths"]["mesh_boundary_file"], str(wshed_vec))
 
     @patch("mpas_land_mesh.workflow.ULRMWorkflow.run")
     def test_run_workflow_helper(self, mock_run):

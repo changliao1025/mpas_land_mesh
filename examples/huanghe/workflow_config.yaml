@@ -10,10 +10,11 @@
 workflow:
   date: "20261101"                                # Run date (YYYYMMDD)
   mesh_type: mpas                                 # Target mesh family (MPAS / JIGSAW)
-  case_index: 1                                   # Case index number
+  case_index: 2                                   # Case index number
   model: jigsaw                                   # Core mesh generation backend
-  simplify_hydrosheds_river_network: true        # Optional line simplification for rivers
+  process_river_network: true        # Optional line simplification for rivers
   process_coastline: true                        # Coastline masking and buffering
+  process_watershed_boundary: true                  # Optional processing for watershed boundaries
   debug: true                                     # Enable diagnostic logging
   largest_outlets: 1                            # Retain top N largest basin outlets
   run_on_hpc: false                               # Set true to generate SLURM batch job scripts
@@ -40,9 +41,9 @@ paths:
     Windows: D:/scratch/04model/jigsaw/huanghe
     default: ./output
   river_network_raw:
-    Darwin: /Users/changliao/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
-    Linux: /public/home/liaochang/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
-    Windows: D:/data/modeldata/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp
+    Darwin: /Users/changliao/data/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp
+    Linux: /public/home/liaochang/data/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp
+    Windows: D:/data/modeldata/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp
     default: ./data/cropped_river_network.shp
   river_network_vector:
     Darwin: /Users/changliao/data/hexwatershed/huanghe/vector/flowline_hydroshed_simplified_clipped_clean.geojson
@@ -65,14 +66,14 @@ paths:
     Windows: D:/data/modeldata/hexwatershed/huanghe/raster/lake_boundary_mask.tif
     default: ./data/lake_boundary_mask.tif
   mesh_boundary_file:
-    Darwin: /Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
-    Linux: /public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
-    Windows: D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
+    Darwin: /Users/changliao/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
+    Linux: /public/home/liaochang/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
+    Windows: D:/data/modeldata/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
     default: ./data/merged.geojson
   watershed_boundary_vector:
-    Darwin: /Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
-    Linux: /public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
-    Windows: D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson
+    Darwin: /Users/changliao/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
+    Linux: /public/home/liaochang/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
+    Windows: D:/data/modeldata/hexwatershed/huanghe/vector/basin_boundary/merged.geojson
     default: ./data/merged.geojson
   watershed_boundary_raster:
     Darwin: /Users/changliao/data/hexwatershed/huanghe/raster/basin_boundary_mask.tif

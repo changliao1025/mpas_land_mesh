@@ -21,11 +21,19 @@ DEFAULT_ULRM_CONFIG: dict[str, Any] = {
         "mesh_type": "mpas",
         "case_index": 1,
         "model": "jigsaw",
+        "process_river_network": False,
+        "preprocess_river_network": False,
+        "process_coastline": False,
+        "process_watershed_boundary": False,
         "debug": True,
         "run_on_hpc": False,
     },
     "preprocessing": {
+        "process_river_network": False,
+        "preprocess_river_network": False,
         "simplify_rivers": False,
+        "process_coastline": False,
+        "process_watershed_boundary": False,
         "largest_outlets": 10,
         "drainage_area_multiplier": 100.0,
         "process_coastline": False,
@@ -60,6 +68,7 @@ DEFAULT_ULRM_CONFIG: dict[str, Any] = {
         "boundary_vector": "",
         "river_network_raw": "",
         "hydrosheds_rivers": "",  # legacy alias for river_network_raw
+        "watershed_boundary_raw": "",
         "region_geometry": "",
         "dam_vector": "",
         "naturalearth_land": "",
@@ -181,21 +190,65 @@ def load_ulrm_config(
     # Merge with defaults
     config = _deep_merge(DEFAULT_ULRM_CONFIG, raw)
 
-    # Legacy backward-compatibility mappings from workflow -> preprocessing
-    wf = config.get("workflow", {})
+    # Backward-compatibility and synchronization between workflow <-> preprocessing
+    raw_wf = raw.get("workflow", {}) or {}
+    raw_prep = raw.get("preprocessing", {}) or {}
+    wf = config.setdefault("workflow", {})
     prep = config.setdefault("preprocessing", {})
-    if "simplify_hydrosheds_river_network" in wf and "simplify_rivers" not in raw.get(
-        "preprocessing", {}
+
+    # River preprocessing flag
+    river_val = None
+    for k in (
+        "process_river_network",
+        "preprocess_river_network",
+        "simplify_hydrosheds_river_network",
     ):
-        prep["simplify_rivers"] = bool(wf["simplify_hydrosheds_river_network"])
-    if "process_coastline" in wf and "process_coastline" not in raw.get(
-        "preprocessing", {}
-    ):
-        prep["process_coastline"] = bool(wf["process_coastline"])
-    if "largest_outlets" in wf and "largest_outlets" not in raw.get(
-        "preprocessing", {}
-    ):
-        prep["largest_outlets"] = int(wf["largest_outlets"])
+        if k in raw_wf:
+            river_val = raw_wf[k]
+            break
+    if river_val is None:
+        for k in (
+            "process_river_network",
+            "preprocess_river_network",
+            "simplify_rivers",
+        ):
+            if k in raw_prep:
+                river_val = raw_prep[k]
+                break
+
+    if river_val is not None:
+        b_river = bool(river_val)
+        prep["process_river_network"] = b_river
+        prep["preprocess_river_network"] = b_river
+        prep["simplify_rivers"] = b_river
+        wf["process_river_network"] = b_river
+
+    # Coastline preprocessing flag
+    coast_val = None
+    if "process_coastline" in raw_wf:
+        coast_val = raw_wf["process_coastline"]
+    elif "process_coastline" in raw_prep:
+        coast_val = raw_prep["process_coastline"]
+
+    if coast_val is not None:
+        b_coast = bool(coast_val)
+        prep["process_coastline"] = b_coast
+        wf["process_coastline"] = b_coast
+
+    # Watershed boundary preprocessing flag
+    wshed_val = None
+    if "process_watershed_boundary" in raw_wf:
+        wshed_val = raw_wf["process_watershed_boundary"]
+    elif "process_watershed_boundary" in raw_prep:
+        wshed_val = raw_prep["process_watershed_boundary"]
+
+    if wshed_val is not None:
+        b_wshed = bool(wshed_val)
+        prep["process_watershed_boundary"] = b_wshed
+        wf["process_watershed_boundary"] = b_wshed
+
+    if "largest_outlets" in raw_wf and "largest_outlets" not in raw_prep:
+        prep["largest_outlets"] = int(raw_wf["largest_outlets"])
 
     # Normalize date
     if not wf.get("date"):
@@ -212,6 +265,14 @@ def load_ulrm_config(
         if raw_river_path:
             config["paths"]["river_network_raw"] = raw_river_path
             config["paths"]["hydrosheds_rivers"] = raw_river_path
+
+        raw_wshed_path = (
+            config["paths"].get("watershed_boundary_raw")
+            or config["paths"].get("watershed_boundary_vector")
+            or ""
+        )
+        if raw_wshed_path and not config["paths"].get("watershed_boundary_raw"):
+            config["paths"]["watershed_boundary_raw"] = raw_wshed_path
 
     return config
 

@@ -11,12 +11,6 @@ from pyearthmesh.config.config_manager import (
     load_workflow_config,
 )
 
-# --- change_json_key_value (pyearthmesh unified) ---
-from pyearthmesh.utility.change_json_key_value import (
-    change_json_key_value,
-    change_json_keys_values,
-)
-
 # --- constants ---
 from .constants import (
     DRAINAGE_AREA_MULTIPLIER,
@@ -48,7 +42,4 @@ __all__ = [
     "dump_workflow_config",
     "create_workflow",
     "compile_workflow",
-    # change_json_key_value (pyearthmesh unified)
-    "change_json_key_value",
-    "change_json_keys_values",
 ]

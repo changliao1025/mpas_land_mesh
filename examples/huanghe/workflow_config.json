@@ -2,10 +2,11 @@
   "workflow": {
     "date": "20261101",
     "mesh_type": "mpas",
-    "case_index": 1,
+    "case_index": 2,
     "model": "jigsaw",
-    "simplify_hydrosheds_river_network": true,
+    "process_river_network": true,
     "process_coastline": true,
+    "process_watershed_boundary": true,
     "debug": true,
     "largest_outlets": 1,
     "run_on_hpc": false
@@ -32,9 +33,9 @@
       "default": "./output"
     },
     "river_network_raw": {
-      "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp",
-      "Linux": "/public/home/liaochang/data/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp",
-      "Windows": "D:/data/modeldata/hexwatershed/yellowriver/vector/river_network/cropped_river_network.shp",
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/river_network/cropped_river_network.shp",
       "default": "./data/cropped_river_network.shp"
     },
     "river_network_vector": {
@@ -62,15 +63,15 @@
       "default": "./data/lake_boundary_mask.tif"
     },
     "mesh_boundary_file": {
-      "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
-      "Linux": "/public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
-      "Windows": "D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
       "default": "./data/merged.geojson"
     },
     "watershed_boundary_vector": {
-      "Darwin": "/Users/changliao/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
-      "Linux": "/public/home/liaochang/data/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
-      "Windows": "D:/data/modeldata/hexwatershed/yellowriver/vector/basin_boundary/merged.geojson",
+      "Darwin": "/Users/changliao/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
+      "Linux": "/public/home/liaochang/data/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
+      "Windows": "D:/data/modeldata/hexwatershed/huanghe/vector/basin_boundary/merged.geojson",
       "default": "./data/merged.geojson"
     },
     "watershed_boundary_raster": {

@@ -101,7 +101,6 @@ class TestWorkflowConfig(unittest.TestCase):
             "workflow": {
                 "case_index": 5,
                 "mesh_type": "mpas",
-                "process_coastline": True,
             },
             "resolutions": {
                 "ocean_km": 60,
@@ -119,8 +118,6 @@ class TestWorkflowConfig(unittest.TestCase):
         # Check dictionary structure
         self.assertIsInstance(config, dict)
         self.assertEqual(config["workflow"]["case_index"], 5)
-        self.assertTrue(config["workflow"]["process_coastline"])
-        self.assertFalse(config["workflow"]["simplify_hydrosheds_river_network"])
         self.assertIsNotNone(config["workflow"]["date"])
 
         # Check resolutions with merged defaults
@@ -144,7 +141,6 @@ workflow:
   mesh_type: mpas                                 # Target MPAS mesh family
   case_index: 7                                   # Case index
   model: jigsaw                                   # Backend engine
-  process_coastline: true                         # Enable coastline buffer
   run_on_hpc: false                               # Local execution
 
 resolutions:
@@ -166,7 +162,6 @@ jigsaw:
         self.assertEqual(config["workflow"]["mesh_type"], "mpas")
         self.assertEqual(config["workflow"]["case_index"], 7)
         self.assertEqual(config["workflow"]["date"], "20261031")
-        self.assertTrue(config["workflow"]["process_coastline"])
         self.assertEqual(config["resolutions"]["ocean_km"], 75.0)
         self.assertEqual(config["resolutions"]["land_km"], 25.0)
         self.assertEqual(config["resolutions"]["river_network_km"], 5.0)

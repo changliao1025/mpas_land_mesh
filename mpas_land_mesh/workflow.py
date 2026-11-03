@@ -117,7 +117,15 @@ class ULRMWorkflow:
             or paths.get("hydrosheds_rivers")
             or ""
         )
-        bSimplify_rivers = bool(preprocessing.get("simplify_rivers", False))
+        bSimplify_rivers = bool(
+            preprocessing.get(
+                "process_river_network",
+                preprocessing.get(
+                    "preprocess_river_network",
+                    preprocessing.get("simplify_rivers", False),
+                ),
+            )
+        )
 
         if (
             not sFilename_flowline_raw_in
@@ -382,12 +390,68 @@ class ULRMWorkflow:
             sFilename_tif_wo_island = paths["coastline_raster"]
             sFilename_vector_coastline_merged = paths.get("coastline_vector", "")
 
+        # -------------------------------------------------------------------
+        # 3. Watershed Boundary Preprocessing
+        # -------------------------------------------------------------------
+        bProcess_wshed = bool(preprocessing.get("process_watershed_boundary", False))
+        sFilename_wshed_vector = (
+            paths.get("watershed_boundary_raw")
+            or paths.get("watershed_boundary_vector")
+            or ""
+        )
+        sWorkspace_watershed_output = os.path.join(
+            sWorkspace_output, "watershed_boundary"
+        )
+        os.makedirs(sWorkspace_watershed_output, exist_ok=True)
+        sFilename_wshed_raster = os.path.join(
+            sWorkspace_watershed_output, "watershed_boundary_raster.tif"
+        )
+
+        dResolution_wshed_km = float(
+            resolutions.get("watershed_boundary_km") or dResolution_land
+        )
+        dResolution_wshed_x = 30.0 / 3600.0 * dResolution_wshed_km
+        dResolution_wshed_y = dResolution_wshed_x
+
+        if (
+            bProcess_wshed
+            and sFilename_wshed_vector
+            and os.path.exists(sFilename_wshed_vector)
+        ):
+            logger.info(
+                "Rasterizing watershed boundary vector from %s to: %s",
+                sFilename_wshed_vector,
+                sFilename_wshed_raster,
+            )
+            convert_vector_to_global_raster(
+                sFilename_wshed_vector,
+                sFilename_wshed_raster,
+                dResolution_wshed_x,
+                dResolution_wshed_y,
+            )
+        elif os.path.exists(sFilename_wshed_raster):
+            logger.info(
+                "Reusing existing watershed boundary raster: %s",
+                sFilename_wshed_raster,
+            )
+        elif paths.get("watershed_boundary_raster"):
+            sFilename_wshed_raster = paths["watershed_boundary_raster"]
+        else:
+            sFilename_wshed_raster = ""
+
         self.preprocessed_paths = {
             "river_network_raw": sFilename_flowline_raw_in,
             "river_network_vector": sFilename_flowline_out,
             "river_network_raster": sFilename_river_network_raster,
             "coastline_raster": sFilename_tif_wo_island,
             "coastline_vector": sFilename_vector_coastline_merged,
+            "watershed_boundary_vector": sFilename_wshed_vector,
+            "watershed_boundary_raster": sFilename_wshed_raster,
+            "mesh_boundary_file": paths.get("mesh_boundary_file")
+            or paths.get("mesh_boundary")
+            or paths.get("boundary_file")
+            or paths.get("boundary_vector")
+            or "",
             "dam_vector": paths.get("dam_vector", ""),
             "region_geometry": paths.get("region_geometry", ""),
             "output_workspace": sWorkspace_output,
@@ -565,13 +629,12 @@ class ULRMWorkflow:
                 compiled_paths["city_raster"] = p
 
         # 7. Mesh boundary file for cropping the MPAS NetCDF mesh
-        # Priority: mesh_boundary_file / mesh_boundary / boundary_file -> watershed_boundary_vector
         mesh_boundary_file = (
             _get_path("mesh_boundary_file")
             or _get_path("mesh_boundary")
             or _get_path("boundary_file")
             or _get_path("boundary_vector")
-            or _get_path("watershed_boundary_vector")
+            or ""
         )
         if mesh_boundary_file:
             compiled_paths["mesh_boundary_file"] = mesh_boundary_file
